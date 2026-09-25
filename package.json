@@ -7,10 +7,36 @@
   "scripts": {
     "start": "electron .",
     "icon": "node scripts/generate-icon.cjs",
+    "dist:win": "electron-builder --win nsis --x64 --publish never",
     "test": "node --test desktop/test/*.test.cjs"
+  },
+  "build": {
+    "appId": "com.dumbpark.app",
+    "productName": "DumbPark",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "desktop/**",
+      "!desktop/test/**",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": "nsis",
+      "icon": "desktop/assets/dumbpark.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "DumbPark-Setup.${ext}"
+    }
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
-    "electron": "44.4.5"
+    "electron": "44.4.5",
+    "electron-builder": "^26.15.3"
   }
 }
