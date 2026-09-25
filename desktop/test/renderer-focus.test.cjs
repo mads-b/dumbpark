@@ -31,7 +31,7 @@ test('focus clears an expired permit immediately and checks for a new one', asyn
         : new Promise(resolve => { resolveSecondRead = resolve; });
     }
   };
-  const source = fs.readFileSync(path.join(__dirname, '..', 'renderer.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '..', '..', 'ui', 'renderer.js'), 'utf8');
   vm.runInNewContext(source, {
     window: { dumbPark },
     document: { getElementById: element, createElement: () => ({ value: '', textContent: '' }) },

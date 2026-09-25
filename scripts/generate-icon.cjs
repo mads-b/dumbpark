@@ -5,7 +5,7 @@ const path = require('node:path');
 const { Resvg } = require('@resvg/resvg-js');
 
 const assetDir = path.join(__dirname, '..', 'desktop', 'assets');
-const source = fs.readFileSync(path.join(assetDir, 'dumbpark.svg'));
+const source = fs.readFileSync(path.join(__dirname, '..', 'ui', 'assets', 'dumbpark.svg'));
 const sizes = [16, 32, 48, 256];
 const images = sizes.map(size => new Resvg(source, { fitTo: { mode: 'width', value: size } }).render().asPng());
 

@@ -17,9 +17,17 @@ function showResult(result) {
 
 function showSignedIn(signedIn) {
   signedInToSmartPark = signedIn;
+  const webSignInUnavailable = window.dumbPark.capabilities?.canSignIn === false;
   $('session-badge').textContent = signedIn ? 'Signed in' : 'Not signed in';
   $('session-badge').classList.toggle('good', signedIn);
-  $('login-panel').hidden = signedIn;
+  $('login-panel').hidden = signedIn || webSignInUnavailable;
+  $('web-limitation').hidden = signedIn || !webSignInUnavailable;
+  if (webSignInUnavailable) {
+    $('tagline').textContent = 'Web preview of the one-click parking app.';
+    $('arrival-description').textContent = 'Vehicle selection works here. Permit checks and booking will be available when SmartPark supports web sign-in.';
+    $('at-work').disabled = true;
+    $('at-work').textContent = 'Web booking unavailable';
+  }
   $('sign-out').hidden = !signedIn;
 }
 
@@ -182,7 +190,9 @@ window.dumbPark.onSessionState(state => {
   if (state.signedIn) refreshPermit();
   else {
     statusRequest++;
-    showResult({ state: 'needs-sign-in', message: 'Sign in to SmartPark to check your parking status.' });
+    showResult({ state: 'needs-sign-in', message: window.dumbPark.capabilities?.canSignIn === false
+      ? 'SmartPark web sign-in is unavailable. Use the Windows app to check or book parking.'
+      : 'Sign in to SmartPark to check your parking status.' });
   }
 });
 window.dumbPark.onVehiclePlateState(showVehicles);

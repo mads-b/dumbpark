@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { MobileClient } = require('../mobile.cjs');
+const { MobileClient } = require('../../shared/mobile.cjs');
 
 test('follows the Trondheim permit pages and reads the product without purchasing', async () => {
   const calls = [];

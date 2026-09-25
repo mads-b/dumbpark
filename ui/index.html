@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'">
   <title>DumbPark</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -15,7 +15,7 @@
         <div class="brand"><img class="app-icon" src="assets/dumbpark.svg" alt=""><h1>DumbPark</h1></div>
         <span id="session-badge" class="badge">Not signed in</span>
       </div>
-      <p>One click when you arrive at work.</p>
+      <p id="tagline">One click when you arrive at work.</p>
     </header>
 
     <section id="login-panel" class="card" hidden>
@@ -34,9 +34,15 @@
       <p id="login-status" class="small" role="status">A verification window opens when you request a code.</p>
     </section>
 
+    <section id="web-limitation" class="card" hidden>
+      <h2>Web sign-in needs SmartPark support</h2>
+      <p>SmartPark's permit login currently requires an app-only verification bridge. This website cannot book a space until SmartPark provides a web sign-in path.</p>
+      <p class="small">The <a href="https://github.com/mads-b/dumbpark/releases/latest">Windows app</a> can still check and book permits.</p>
+    </section>
+
     <section class="card arrival-card">
       <h2>Work parking</h2>
-      <p>DumbPark checks your current permit and books the free Tieto P40 option if you need one.</p>
+      <p id="arrival-description">DumbPark checks your current permit and books the free Tieto P40 option if you need one.</p>
       <label for="vehicle-plate">Vehicle plate</label>
       <div class="vehicle-row">
         <select id="vehicle-plate"><option value="">Select a car</option></select>
@@ -57,6 +63,7 @@
 
     <button id="sign-out" class="text-button" hidden>Sign out of SmartPark</button>
   </main>
+  <script src="adapter.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

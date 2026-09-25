@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { bookTieto, osloDate, assessVehiclePermit, assessMobilePermits } = require('../booking.cjs');
+const { bookTieto, osloDate, assessVehiclePermit, assessMobilePermits } = require('../../shared/booking.cjs');
 
 const now = new Date('2026-09-25T08:30:00Z');
 const variant = { id: 'variant-1', priceCents: 0,

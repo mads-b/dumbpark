@@ -1,7 +1,5 @@
 'use strict';
 
-const { randomUUID } = require('node:crypto');
-
 const TARGET = 'tieto booking sluppen p40';
 
 function osloDate(at = new Date()) {
@@ -134,7 +132,7 @@ async function bookTieto(client, { plateNumber, now = new Date() } = {}) {
   let acquired;
   client.uncertainAcquisition = true;
   await client.persistSession?.();
-  try { acquired = await client.acquirePermit(prepared.variantId, prepared.formData, randomUUID()); }
+  try { acquired = await client.acquirePermit(prepared.variantId, prepared.formData, globalThis.crypto.randomUUID()); }
   catch (error) {
     const after = await confirmPermit(client);
     if (after) {

@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { emptyVehicles, addVehicle, selectVehicle, parseVehicles } = require('../vehicles.cjs');
+const { emptyVehicles, addVehicle, selectVehicle, parseVehicles } = require('../../shared/vehicles.cjs');
 
 test('migrates the previously saved single plate and keeps it selected', () => {
   assert.deepEqual(parseVehicles('ab12345'), {

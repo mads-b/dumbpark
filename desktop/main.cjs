@@ -3,15 +3,20 @@
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { app, BrowserWindow, ipcMain, powerMonitor, safeStorage } = require('electron');
-const { assessMobilePermits, assessVehiclePermit, plateFromPermits, validPlate, bookTieto } = require('./booking.cjs');
-const { MobileClient } = require('./mobile.cjs');
-const { emptyVehicles, addVehicle, selectVehicle, parseVehicles } = require('./vehicles.cjs');
+const { plateFromPermits, validPlate } = require('../shared/booking.cjs');
+const { MobileClient } = require('../shared/mobile.cjs');
+const { emptyVehicles, addVehicle, parseVehicles } = require('../shared/vehicles.cjs');
+const { ParkingService } = require('../shared/parking-service.cjs');
 
 const mobileClient = new MobileClient();
 let dashboard;
 let challengeWindow;
 let pendingPhone;
 let vehicles = emptyVehicles();
+const parkingService = new ParkingService(mobileClient, {
+  saveVehicles: saveVehicles,
+  saveSession: saveMobileSession
+});
 
 const sessionFile = () => path.join(app.getPath('userData'), 'mobile-session.bin');
 const plateFile = () => path.join(app.getPath('userData'), 'vehicle-plate.bin');
@@ -90,7 +95,7 @@ function createDashboard() {
       sandbox: true
     }
   });
-  dashboard.loadFile(path.join(__dirname, 'index.html'));
+  dashboard.loadFile(path.join(__dirname, '..', 'ui', 'index.html'));
   dashboard.webContents.on('did-finish-load', () => {
     sendToDashboard('session-state', { signedIn: Boolean(mobileClient.token) });
     sendToDashboard('vehicle-plate-state', vehicles);
@@ -125,59 +130,32 @@ app.whenReady().then(async () => {
   mobileClient.persistSession = async () => { await saveMobileSession(); };
   const mobileRestored = await restoreMobileSession();
   await restoreVehicles();
+  parkingService.vehicles = vehicles;
   if (mobileRestored && !vehicles.plateNumbers.length) {
     try {
       const plate = plateFromPermits(await mobileClient.getMyPermits());
-      if (plate && validPlate(plate)) await saveVehicles(addVehicle(vehicles, plate));
+      if (plate && validPlate(plate)) await parkingService.updateVehicles(addVehicle(parkingService.vehicles, plate));
     } catch { /* The plate can be entered in the dashboard. */ }
   }
 
   ipcMain.handle('at-work', async (event, plateNumber) => {
     fromDashboard(event);
-    if (!plateNumber || !vehicles.plateNumbers.includes(plateNumber)) {
-      return { state: 'needs-plate', message: 'Choose or add a vehicle plate.' };
-    }
-    if (plateNumber !== vehicles.selectedPlate) {
-      await saveVehicles(selectVehicle(vehicles, plateNumber));
-    }
-    if (!mobileClient.token) {
-      return { state: 'needs-sign-in', message: 'Sign in to SmartPark to check and book your permit.' };
-    }
-    try {
-      const result = await bookTieto(mobileClient, { plateNumber });
-      await saveMobileSession().catch(() => false);
-      return result;
-    } catch (error) {
-      return { state: 'error', message: `Booking stopped: ${error.message}` };
-    }
+    return parkingService.atWork(plateNumber);
   });
 
   ipcMain.handle('add-vehicle', async (event, plateNumber) => {
     fromDashboard(event);
-    return saveVehicles(addVehicle(vehicles, plateNumber));
+    return parkingService.addVehicle(plateNumber);
   });
 
   ipcMain.handle('select-vehicle', async (event, plateNumber) => {
     fromDashboard(event);
-    return saveVehicles(selectVehicle(vehicles, plateNumber));
+    return parkingService.selectVehicle(plateNumber);
   });
 
   ipcMain.handle('check-permit', async event => {
     fromDashboard(event);
-    if (!mobileClient.token) {
-      return { state: 'needs-sign-in', message: 'Sign in to SmartPark to check your parking status.' };
-    }
-    try {
-      const state = assessVehiclePermit(await mobileClient.getMyPermits(), vehicles.selectedPlate);
-      if (state.state === 'missing') {
-        return { state: 'missing', message: vehicles.plateNumbers.length
-          ? '⚠ No active Tieto P40 booking! At work? Click the green button below now.'
-          : '⚠ No active Tieto P40 booking! Add a car with +, then click the green button below.' };
-      }
-      return state;
-    } catch (error) {
-      return { state: 'unknown', message: `Could not check your parking status: ${error.message}` };
-    }
+    return parkingService.checkPermit();
   });
 
   ipcMain.handle('request-code', async (event, phoneNumber) => {
@@ -195,24 +173,15 @@ app.whenReady().then(async () => {
     await mobileClient.verifyCode(code);
     const remembered = await saveMobileSession().catch(() => false);
     sendToDashboard('session-state', { signedIn: true });
-    let assessment;
-    try {
-      const permits = await mobileClient.getMyPermits();
-      assessment = assessMobilePermits(permits);
-      const plate = plateFromPermits(permits);
-      if (plate && validPlate(plate)) await saveVehicles(addVehicle(vehicles, plate, false));
-    } catch { /* Sign-in still succeeds if the initial permit read fails. */ }
+    const assessment = await parkingService.afterSignIn();
     return { message: remembered ? 'Signed in to SmartPark.' : 'Signed in for this run.', assessment };
   });
 
   ipcMain.handle('sign-out', async event => {
     fromDashboard(event);
-    mobileClient.token = undefined;
-    mobileClient.productsService = undefined;
-    mobileClient.pendingOrderId = undefined;
-    mobileClient.uncertainAcquisition = false;
+    parkingService.clearSession();
     pendingPhone = undefined;
-    vehicles = emptyVehicles();
+    vehicles = parkingService.vehicles;
     await fs.rm(sessionFile(), { force: true });
     await fs.rm(plateFile(), { force: true });
     sendToDashboard('vehicle-plate-state', vehicles);

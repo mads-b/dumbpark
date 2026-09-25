@@ -11,6 +11,7 @@ header { margin-bottom: 26px; }
 h1 { font-size: 42px; letter-spacing: -.05em; margin: 4px 0; }
 h2 { font-size: 18px; margin: 0 0 10px; }
 p { color: #afc0b7; line-height: 1.45; margin: 8px 0 18px; }
+a { color: #79dfaa; }
 .small { font-size: 12px; margin-bottom: 0; }
 .badge { border: 1px solid #52685b; color: #b5c8bb; border-radius: 99px; padding: 5px 10px; font-size: 11px; white-space: nowrap; }
 .badge.good { border-color: #3ba678; color: #79dfaa; }

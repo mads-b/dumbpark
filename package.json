@@ -1,11 +1,12 @@
 {
   "name": "dumbpark",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
-  "description": "Local one-click SmartPark permit prototype",
+  "description": "Shared SmartPark permit app for Electron and the web",
   "main": "desktop/main.cjs",
   "scripts": {
     "start": "electron .",
+    "build:web": "node scripts/build-web.cjs",
     "icon": "node scripts/generate-icon.cjs",
     "dist:win": "electron-builder --win nsis --x64 --publish never",
     "test": "node --test desktop/test/*.test.cjs"
@@ -18,6 +19,8 @@
     },
     "files": [
       "desktop/**",
+      "shared/**",
+      "ui/**",
       "!desktop/test/**",
       "package.json"
     ],
@@ -37,6 +40,7 @@
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "electron": "44.4.5",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.25.12"
   }
 }

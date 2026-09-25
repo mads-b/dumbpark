@@ -1,6 +1,6 @@
 # DumbPark
 
-A small Electron app for the **Tieto Booking Sluppen P40** parking permit.
+A one-click app for the **Tieto Booking Sluppen P40** parking permit. The Electron app can sign in and book. The [GitHub Pages website](https://mads-b.github.io/dumbpark/) shares its interface and parking code, but SmartPark does not yet provide the browser sign-in callback it needs. The site clearly displays this limitation and does not pretend a booking was made.
 
 ## Run
 
@@ -8,6 +8,19 @@ A small Electron app for the **Tieto Booking Sluppen P40** parking permit.
 npm install
 npm start
 ```
+
+## Website
+
+```powershell
+npm ci
+npm run build:web
+```
+
+`dist-web/` is the static GitHub Pages artifact. The workflow publishes it on pushes to `main` after GitHub Pages has been enabled with **GitHub Actions** as its source. The browser adapter currently saves selected vehicles in a site-scoped cookie; it cannot sign in or book yet.
+
+SmartPark's mobile API rejects ordinary browser user agents with `403 Unsupported Client`. Its verification page reports the challenge token through `window.webkit.messageHandlers`, which is available in Electron but not a normal browser. Its Cloudflare Turnstile site key is tied to SmartPark's domain. A gateway alone can handle the API's user-agent requirement, but it cannot supply a legitimate web verification callback. A supported SmartPark web login/API flow or vendor cooperation is needed before browser bookings can be enabled. A JavaScript-readable cookie would not solve sign-in and would expose its token to scripts on the same origin, so DumbPark does not store a token that way.
+
+The shared parking protocol, booking checks, and vehicle logic live in `shared/`; Electron's encrypted storage and verification window live in `desktop/`; the browser adapter lives in `web/`; and both modes render `ui/`. There are no duplicated booking rules.
 
 ## Share with Windows users
 
@@ -20,11 +33,11 @@ npm run dist:win
 
 Share `dist/DumbPark-Setup.exe`. Recipients run the installer and open DumbPark from the Start menu or desktop shortcut; they do not need Node.js. The installer includes the app code and icon, but never the signed-in session or saved cars from your Windows profile. Sign in on each recipient's computer.
 
-For GitHub downloads, push a version tag matching `package.json` (for example, `v0.1.1` for version `0.1.1`). The release workflow builds the installer and adds it to GitHub Releases. Share the [latest release page](https://github.com/mads-b/dumbpark/releases/latest) or the [direct installer link](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Setup.exe).
+For GitHub downloads, push a version tag matching `package.json` (for example, `v0.2.0` for version `0.2.0`). The release workflow builds the installer and adds it to GitHub Releases. Share the [latest release page](https://github.com/mads-b/dumbpark/releases/latest) or the [direct installer link](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Setup.exe).
 
 The installer is currently unsigned. For broad distribution, sign the Windows build so recipients do not encounter an untrusted publisher warning.
 
-The icon source is `desktop/assets/dumbpark.svg`. Run `npm run icon` after changing it to regenerate the PNG and Windows ICO files.
+The icon source is `ui/assets/dumbpark.svg`. Run `npm run icon` after changing it to regenerate the PNG and Windows ICO files.
 
 Sign in to SmartPark with your phone number and SMS code if prompted. DumbPark saves the session and your vehicle plates encrypted for your Windows account. Use **+** to add a car and the dropdown to choose which one to book. **Sign out of SmartPark** clears the saved session and cars.
 
