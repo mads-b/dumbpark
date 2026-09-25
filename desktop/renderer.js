@@ -3,14 +3,20 @@
 const $ = id => document.getElementById(id);
 let statusRequest = 0;
 let currentVehicles = { plateNumbers: [], selectedPlate: null };
+let displayedResult;
+let signedInToSmartPark = false;
+let bookingInProgress = false;
+let focusRefreshPending = false;
 
 function showResult(result) {
+  displayedResult = result;
   const state = result?.state || 'error';
   $('result').dataset.state = state;
   $('result').textContent = result?.message || 'SmartPark did not return a booking status.';
 }
 
 function showSignedIn(signedIn) {
+  signedInToSmartPark = signedIn;
   $('session-badge').textContent = signedIn ? 'Signed in' : 'Not signed in';
   $('session-badge').classList.toggle('good', signedIn);
   $('login-panel').hidden = signedIn;
@@ -35,15 +41,43 @@ function showVehicles(state) {
   select.value = state.selectedPlate || '';
 }
 
-async function refreshPermit() {
+function focusCallToAction(unverified = false) {
+  const prompt = currentVehicles.plateNumbers.length
+    ? 'At work? Click the green button below now.'
+    : 'Add a car with +, then click the green button below.';
+  return { state: 'missing', message: unverified
+    ? `⚠ No current Tieto P40 booking is confirmed. SmartPark could not verify a new one. ${prompt}`
+    : `⚠ Your previous Tieto P40 booking has expired. ${prompt}` };
+}
+
+async function refreshPermit({ keepCallToAction = false } = {}) {
   const request = ++statusRequest;
-  showResult({ state: 'checking', message: 'Checking your parking status…' });
+  if (!keepCallToAction) showResult({ state: 'checking', message: 'Checking your parking status…' });
   try {
     const result = await window.dumbPark.checkPermit();
-    if (request === statusRequest) showResult(result);
+    if (request === statusRequest) {
+      showResult(keepCallToAction && result.state === 'unknown' ? focusCallToAction(true) : result);
+    }
   } catch (error) {
-    if (request === statusRequest) showResult({ state: 'error', message: error.message });
+    if (request === statusRequest) {
+      showResult(keepCallToAction ? focusCallToAction(true) : { state: 'error', message: error.message });
+    }
   }
+}
+
+async function checkPermitOnFocus() {
+  if (!signedInToSmartPark || bookingInProgress || focusRefreshPending ||
+      displayedResult?.state === 'checking') return;
+  let keepCallToAction = displayedResult?.state === 'missing';
+  if (displayedResult?.state === 'active' || displayedResult?.state === 'booked') {
+    const expiry = displayedResult.validToEpochMs;
+    if (Number.isFinite(expiry) && expiry > Date.now()) return;
+    showResult(focusCallToAction());
+    keepCallToAction = true;
+  }
+  focusRefreshPending = true;
+  try { await refreshPermit({ keepCallToAction }); }
+  finally { focusRefreshPending = false; }
 }
 
 $('show-add-vehicle').addEventListener('click', () => {
@@ -89,6 +123,7 @@ $('vehicle-plate').addEventListener('change', async () => {
 $('at-work').addEventListener('click', async () => {
   const button = $('at-work');
   button.disabled = true;
+  bookingInProgress = true;
   statusRequest++;
   showResult({ state: 'checking', message: 'Checking your Tieto P40 permit…' });
   try {
@@ -97,6 +132,7 @@ $('at-work').addEventListener('click', async () => {
     showResult({ state: 'error', message: error.message });
   } finally {
     button.disabled = false;
+    bookingInProgress = false;
   }
 });
 
@@ -144,7 +180,11 @@ $('sign-out').addEventListener('click', async () => {
 window.dumbPark.onSessionState(state => {
   showSignedIn(state.signedIn);
   if (state.signedIn) refreshPermit();
-  else showResult({ state: 'needs-sign-in', message: 'Sign in to SmartPark to check your parking status.' });
+  else {
+    statusRequest++;
+    showResult({ state: 'needs-sign-in', message: 'Sign in to SmartPark to check your parking status.' });
+  }
 });
 window.dumbPark.onVehiclePlateState(showVehicles);
+window.dumbPark.onDashboardFocus(checkPermitOnFocus);
 window.dumbPark.onLoginState(state => { $('login-status').textContent = state.message; });

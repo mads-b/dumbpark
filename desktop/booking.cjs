@@ -22,7 +22,7 @@ function assessMobilePermits(permits, at = new Date()) {
     if (!Number.isFinite(end)) continue;
     if (end > at.getTime() && (!Number.isFinite(start) || start <= at.getTime())) {
       return { state: 'active', message: `Tieto P40 permit active until ${new Date(end).toLocaleString()}.`,
-        validToTime: permit.expiresAt, plateNumber: plateFromPermit(permit) };
+        validToTime: permit.expiresAt, validToEpochMs: end, plateNumber: plateFromPermit(permit) };
     }
     if (end > at.getTime() && start > at.getTime()) {
       return { state: 'scheduled', message: 'A Tieto P40 permit is already scheduled.' };
@@ -161,8 +161,9 @@ async function bookTieto(client, { plateNumber, now = new Date() } = {}) {
   }
   client.uncertainAcquisition = false;
   await client.persistSession?.();
+  const end = Date.parse(acquired.permit.expiresAt);
   return { state: 'booked', message: 'SmartPark confirmed the Tieto P40 booking.',
-    validToTime: acquired.permit.expiresAt || null };
+    validToTime: acquired.permit.expiresAt || null, validToEpochMs: Number.isFinite(end) ? end : null };
 }
 
 module.exports = { osloDate, assessMobilePermits, assessVehiclePermit, plateFromPermits, validPlate,

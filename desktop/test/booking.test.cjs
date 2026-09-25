@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { bookTieto, osloDate, assessVehiclePermit } = require('../booking.cjs');
+const { bookTieto, osloDate, assessVehiclePermit, assessMobilePermits } = require('../booking.cjs');
 
 const now = new Date('2026-09-25T08:30:00Z');
 const variant = { id: 'variant-1', priceCents: 0,
@@ -31,6 +31,7 @@ test('uses the Oslo date and books one free available variant once', async () =>
   const { client, calls } = clientWith();
   const result = await bookTieto(client, { plateNumber: 'AB12345', now });
   assert.equal(result.state, 'booked');
+  assert.ok(Number.isFinite(result.validToEpochMs));
   assert.equal(osloDate(now), '2026-09-25');
   assert.deepEqual(calls[2].slice(0, 3), ['preview', 'variant-1', [
     { name: 'plate_number_1', value: 'AB12345' },
@@ -47,6 +48,14 @@ test('does not acquire when a Tieto permit is already active', async () => {
   });
   assert.equal((await bookTieto(client, { now })).state, 'active');
   assert.deepEqual(calls, []);
+});
+
+test('active assessment includes a numeric expiry for local validity checks', () => {
+  const permit = { name: 'Tieto Booking Sluppen P40',
+    validFrom: '2026-09-25T08:00:00Z', expiresAt: '2026-09-25T20:00:00Z' };
+  const result = assessMobilePermits([permit], now);
+  assert.equal(result.state, 'active');
+  assert.equal(result.validToEpochMs, Date.parse(permit.expiresAt));
 });
 
 test('reports when the active permit covers a different saved car', async () => {

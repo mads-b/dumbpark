@@ -2,7 +2,7 @@
 
 const path = require('node:path');
 const fs = require('node:fs/promises');
-const { app, BrowserWindow, ipcMain, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, powerMonitor, safeStorage } = require('electron');
 const { assessMobilePermits, assessVehiclePermit, plateFromPermits, validPlate, bookTieto } = require('./booking.cjs');
 const { MobileClient } = require('./mobile.cjs');
 const { emptyVehicles, addVehicle, selectVehicle, parseVehicles } = require('./vehicles.cjs');
@@ -95,6 +95,7 @@ function createDashboard() {
     sendToDashboard('session-state', { signedIn: Boolean(mobileClient.token) });
     sendToDashboard('vehicle-plate-state', vehicles);
   });
+  dashboard.on('focus', () => sendToDashboard('dashboard-focus'));
   dashboard.on('closed', () => { dashboard = null; });
 }
 
@@ -119,6 +120,8 @@ async function createChallenge() {
 
 app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.dumbpark.app');
+  powerMonitor.on('resume', () => sendToDashboard('dashboard-focus'));
+  powerMonitor.on('unlock-screen', () => sendToDashboard('dashboard-focus'));
   mobileClient.persistSession = async () => { await saveMobileSession(); };
   const mobileRestored = await restoreMobileSession();
   await restoreVehicles();

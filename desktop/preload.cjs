@@ -12,5 +12,6 @@ contextBridge.exposeInMainWorld('dumbPark', {
   signOut: () => ipcRenderer.invoke('sign-out'),
   onSessionState: callback => ipcRenderer.on('session-state', (_event, state) => callback(state)),
   onVehiclePlateState: callback => ipcRenderer.on('vehicle-plate-state', (_event, state) => callback(state)),
+  onDashboardFocus: callback => ipcRenderer.on('dashboard-focus', () => callback()),
   onLoginState: callback => ipcRenderer.on('login-state', (_event, state) => callback(state))
 });
