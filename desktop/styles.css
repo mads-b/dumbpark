@@ -1,0 +1,40 @@
+:root { color-scheme: dark; font-family: Segoe UI, system-ui, sans-serif; background: #101514; color: #eaf1ec; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; }
+main { max-width: 580px; margin: 0 auto; padding: 38px 28px; }
+header { margin-bottom: 26px; }
+.eyebrow { color: #69d2a1; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
+.heading-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.app-icon { width: 48px; height: 48px; flex: none; }
+h1 { font-size: 42px; letter-spacing: -.05em; margin: 4px 0; }
+h2 { font-size: 18px; margin: 0 0 10px; }
+p { color: #afc0b7; line-height: 1.45; margin: 8px 0 18px; }
+.small { font-size: 12px; margin-bottom: 0; }
+.badge { border: 1px solid #52685b; color: #b5c8bb; border-radius: 99px; padding: 5px 10px; font-size: 11px; white-space: nowrap; }
+.badge.good { border-color: #3ba678; color: #79dfaa; }
+.card { background: #1b2420; border: 1px solid #32443a; border-radius: 14px; padding: 22px; margin: 14px 0; }
+label { display: block; color: #afc0b7; font-size: 12px; margin: 14px 0 5px; }
+input, select { width: 100%; padding: 11px 12px; border: 1px solid #496050; border-radius: 8px; background: #101514; color: #eaf1ec; font: inherit; font-size: 14px; }
+#new-vehicle-plate { text-transform: uppercase; }
+.vehicle-row { display: flex; gap: 8px; }
+.vehicle-row select { flex: 1; min-width: 0; }
+.add-button { width: 43px; flex: none; font-size: 25px; line-height: 1; padding: 6px; }
+.add-vehicle-form { margin-top: 10px; }
+.add-vehicle-form label { margin-top: 0; }
+.vehicle-status { min-height: 17px; margin: 6px 0 0; }
+.input-row { display: flex; gap: 8px; }
+.input-row input { flex: 1; min-width: 0; }
+button { background: #2b3a32; border: 1px solid #496050; border-radius: 8px; color: #eaf1ec; padding: 10px 13px; font: inherit; font-size: 13px; cursor: pointer; }
+button:hover { background: #3b5243; }
+button:disabled { opacity: .55; cursor: wait; }
+button.primary { width: 100%; background: #218e60; border-color: #38a572; font-size: 17px; font-weight: 650; padding: 16px; margin-top: 14px; }
+button.primary:hover { background: #29a872; }
+.result { border: 1px solid #415a49; border-radius: 9px; padding: 13px 14px; margin-top: 14px; color: #c4d5ca; line-height: 1.4; }
+.result[data-state="active"], .result[data-state="booked"], .result[data-state="scheduled"] { border-color: #3ba678; color: #8be6b5; }
+.result[data-state="pending"], .result[data-state="unknown"], .result[data-state="error"], .result[data-state="needs-plate"], .result[data-state="needs-sign-in"], .result[data-state="unavailable"] { border-color: #a6894d; color: #e6bd71; }
+.result[data-state="missing"], .result[data-state="vehicle-mismatch"] { border: 2px solid #ff6666; background: #5a1b25; color: #ffe8e5; font-weight: 750; box-shadow: 0 0 0 3px #ff66661a; }
+.text-button { display: block; border: 0; background: none; color: #89a194; margin: 16px auto 0; }
+.text-button:hover { background: none; color: #b5c8bb; text-decoration: underline; }
+@media (max-width: 550px) { main { padding: 26px 16px; } .input-row { flex-wrap: wrap; } .input-row button { width: 100%; } h1 { font-size: 36px; } .app-icon { width: 42px; height: 42px; } }

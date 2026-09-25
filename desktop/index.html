@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <title>DumbPark</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">TIETO · SLUPPEN P40</div>
+      <div class="heading-row">
+        <div class="brand"><img class="app-icon" src="assets/dumbpark.svg" alt=""><h1>DumbPark</h1></div>
+        <span id="session-badge" class="badge">Not signed in</span>
+      </div>
+      <p>One click when you arrive at work.</p>
+    </header>
+
+    <section id="login-panel" class="card" hidden>
+      <h2>Sign in to SmartPark</h2>
+      <p>Use the phone number on your SmartPark account. You only need to do this when your session expires.</p>
+      <label for="phone">Phone number</label>
+      <div class="input-row">
+        <input id="phone" type="tel" autocomplete="tel" placeholder="Your SmartPark number">
+        <button id="request-code">Send code</button>
+      </div>
+      <label for="code">SMS code</label>
+      <div class="input-row">
+        <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from SMS">
+        <button id="verify-code">Verify</button>
+      </div>
+      <p id="login-status" class="small" role="status">A verification window opens when you request a code.</p>
+    </section>
+
+    <section class="card arrival-card">
+      <h2>Work parking</h2>
+      <p>DumbPark checks your current permit and books the free Tieto P40 option if you need one.</p>
+      <label for="vehicle-plate">Vehicle plate</label>
+      <div class="vehicle-row">
+        <select id="vehicle-plate"><option value="">Select a car</option></select>
+        <button id="show-add-vehicle" class="add-button" type="button" aria-label="Add a car" title="Add a car">+</button>
+      </div>
+      <form id="add-vehicle-form" class="add-vehicle-form" hidden>
+        <label for="new-vehicle-plate">New registration number</label>
+        <div class="input-row">
+          <input id="new-vehicle-plate" type="text" autocomplete="off" placeholder="e.g. AB12345" maxlength="16" required>
+          <button id="save-vehicle" type="submit">Add car</button>
+          <button id="cancel-add-vehicle" type="button">Cancel</button>
+        </div>
+      </form>
+      <p id="vehicle-status" class="small vehicle-status" role="status"></p>
+      <div id="result" class="result" role="status" aria-live="polite">Ready when you are.</div>
+      <button id="at-work" class="primary">I'm at work now</button>
+    </section>
+
+    <button id="sign-out" class="text-button" hidden>Sign out of SmartPark</button>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DumbPark parking icon">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eaf5f1"/>
+    </linearGradient>
+    <linearGradient id="letter" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#136bab"/>
+      <stop offset="1" stop-color="#084a82"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="105" fill="url(#tile)"/>
+  <rect x="21" y="21" width="470" height="470" rx="100" fill="none" stroke="#d5e5e8" stroke-width="10"/>
+  <path d="M147 386V126h126c72 0 118 42 118 106s-46 106-118 106h-57v48h-69zm69-199v90h55c37 0 57-16 57-45s-20-45-57-45h-55z" fill="url(#letter)" fill-rule="evenodd"/>
+  <circle cx="373" cy="371" r="62" fill="#d9f5e8"/>
+  <circle cx="373" cy="371" r="52" fill="#20a76b"/>
+  <path d="m348 371 17 18 35-39" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="13"/>
+</svg>

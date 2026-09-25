@@ -1,0 +1,16 @@
+{
+  "name": "dumbpark",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local one-click SmartPark permit prototype",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "icon": "node scripts/generate-icon.cjs",
+    "test": "node --test desktop/test/*.test.cjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "electron": "44.4.5"
+  }
+}
