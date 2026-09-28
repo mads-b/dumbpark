@@ -7,8 +7,8 @@ android {
         applicationId = "no.dumbpark.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.3.3"
+        versionCode = 5
+        versionName = "0.3.4"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -20,4 +20,7 @@ android {
 dependencies {
     implementation("com.google.android.gms:play-services-location:21.4.0")
     implementation("androidx.webkit:webkit:1.16.0")
+    implementation("androidx.work:work-runtime:2.11.2")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20250517")
 }

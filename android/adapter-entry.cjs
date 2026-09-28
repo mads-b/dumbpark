@@ -42,12 +42,14 @@ try { saved = JSON.parse(window.DumbParkNative.readState() || '{}'); } catch { /
 client.token = saved.session?.token || undefined;
 client.pendingOrderId = saved.session?.pendingOrderId || undefined;
 client.uncertainAcquisition = Boolean(saved.session?.uncertainAcquisition);
+let permitListPath = saved.session?.pathToMyPermits || null;
 let vehicles = parseVehicles(saved.vehicles);
 
 function persist() {
   const result = window.DumbParkNative.writeState(JSON.stringify({
     session: { token: client.token, pendingOrderId: client.pendingOrderId,
-      uncertainAcquisition: client.uncertainAcquisition }, vehicles
+      uncertainAcquisition: client.uncertainAcquisition,
+      pathToMyPermits: client.productsService?.pathToMyPermits || permitListPath }, vehicles
   }));
   if (result !== 'ok') throw new Error(result || 'Could not save encrypted state.');
 }
@@ -79,6 +81,7 @@ window.dumbPark = {
   },
   async verifyCode(code) {
     await client.verifyCode(code);
+    permitListPath = client.productsService?.pathToMyPermits || null;
     persist();
     const assessment = await service.afterSignIn();
     emit('session', { signedIn: true });
@@ -88,6 +91,7 @@ window.dumbPark = {
     service.clearSession();
     vehicles = emptyVehicles();
     pendingPhone = undefined;
+    permitListPath = null;
     persist();
     emit('vehicles', vehicles);
     emit('session', { signedIn: false });
@@ -113,11 +117,14 @@ async function restoreSession() {
       const account = await client.request('client/account', { authenticated: true });
       client.productsService = account.parkingServices?.[0]?.clientServices?.products;
       if (!client.productsService?.pathToPermitShops) throw new Error('Permit shop unavailable.');
+      permitListPath = client.productsService.pathToMyPermits || null;
+      persist();
     } catch {
       client.token = undefined;
       client.productsService = undefined;
       client.pendingOrderId = undefined;
       client.uncertainAcquisition = false;
+      permitListPath = null;
       persist();
     }
   }

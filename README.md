@@ -32,9 +32,9 @@ npm run build:android-assets
 gradle -p android :app:assembleDebug
 ```
 
-Install `android/app/build/outputs/apk/debug/app-debug.apk` on a device with Google Play services and a current Android System WebView. Sign in with SmartPark and choose a saved vehicle. Tap **Enable arrival reminders**, then allow notifications, precise location and **Allow all the time** location. The app monitors two 200 m circles centered on the parking lot (63.3994293, 10.3980961) and office (63.3984618, 10.3956557). After a five-minute dwell in either, it posts one local reminder per Oslo calendar day. Tapping that reminder opens DumbPark and invokes the same permit check and booking flow as the green button. No booking request is sent by the geofence receiver itself.
+Install `android/app/build/outputs/apk/debug/app-debug.apk` on a device with Google Play services and a current Android System WebView. Sign in with SmartPark and choose a saved vehicle. Tap **Enable arrival reminders**, then allow notifications, precise location and **Allow all the time** location. The app monitors two 200 m circles centered on the parking lot (63.3994293, 10.3980961) and office (63.3984618, 10.3956557). After a five-minute dwell in either, it checks SmartPark for a current Tieto P40 permit for the selected car. It posts at most one reminder per Oslo calendar day, only when SmartPark confirms no such permit exists. If the session is unavailable or the check fails, it stays quiet. Tapping a reminder opens DumbPark and invokes the same permit check and booking flow as the green button. The background check never books a permit.
 
-Android may deliver geofence events a few minutes late, depending on location and battery settings. Location remains on the device; DumbPark sends SmartPark requests only after sign-in, manual permit checks or a booking tap. The APK published by the release workflow is **debug signed** for testing. To distribute a trusted production APK, configure a stable private release signing key in CI and change the workflow to build `assembleRelease`; never commit the key to this repository.
+Android may deliver geofence events a few minutes late, depending on location and battery settings. Location remains on the device; DumbPark also makes a read-only SmartPark permit request after a geofence dwell. The APK published by the release workflow is **debug signed** for testing. To distribute a trusted production APK, configure a stable private release signing key in CI and change the workflow to build `assembleRelease`; never commit the key to this repository.
 
 ## Share with Windows users
 
@@ -47,7 +47,7 @@ npm run dist:win
 
 Share `dist/DumbPark-Setup.exe`. Recipients run the installer and open DumbPark from the Start menu or desktop shortcut; they do not need Node.js. The installer includes the app code and icon, but never the signed-in session or saved cars from your Windows profile. Sign in on each recipient's computer.
 
-For GitHub downloads, push a version tag matching `package.json` (for example, `v0.3.3` for version `0.3.3`). The release workflow builds the Windows installer and Android test APK and adds both to GitHub Releases. Share the [latest release page](https://github.com/mads-b/dumbpark/releases/latest), the [direct installer link](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Setup.exe), or the [Android test APK](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Android-debug.apk).
+For GitHub downloads, push a version tag matching `package.json` (for example, `v0.3.4` for version `0.3.4`). The release workflow builds the Windows installer and Android test APK and adds both to GitHub Releases. Share the [latest release page](https://github.com/mads-b/dumbpark/releases/latest), the [direct installer link](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Setup.exe), or the [Android test APK](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Android-debug.apk).
 
 The installer is currently unsigned. For broad distribution, sign the Windows build so recipients do not encounter an untrusted publisher warning.
 

@@ -22,12 +22,6 @@ import android.widget.FrameLayout;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -252,46 +246,10 @@ public final class MainActivity extends Activity {
     }
 
     private void performRequest(String id, JSONObject payload) {
-        HttpURLConnection connection = null;
         try {
-            URL url = new URL(payload.getString("url"));
-            if (!"https".equals(url.getProtocol()) || !"parko.giantleap.no".equals(url.getHost()) ||
-                url.getPort() != -1 || url.getUserInfo() != null || !url.getPath().startsWith("/")) {
-                throw new IllegalArgumentException("Unexpected SmartPark API address.");
-            }
-            String method = payload.optString("method", "GET");
-            if (!method.equals("GET") && !method.equals("POST")) throw new IllegalArgumentException("Unexpected SmartPark API method.");
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setInstanceFollowRedirects(false);
-            connection.setConnectTimeout(15000);
-            connection.setReadTimeout(15000);
-            connection.setRequestMethod(method);
-            JSONObject headers = payload.getJSONObject("headers");
-            for (String name : new String[]{"User-Agent", "X-PartnerId", "X-GLTLocale", "Content-Type", "X-Token", "X-GLT-IDEMPOTENCY-KEY"}) {
-                if (headers.has(name)) connection.setRequestProperty(name, headers.getString(name));
-            }
-            if (method.equals("POST")) {
-                connection.setDoOutput(true);
-                byte[] bytes = payload.optString("body", "").getBytes(StandardCharsets.UTF_8);
-                if (bytes.length > 65536) throw new IllegalArgumentException("Request is too large.");
-                try (OutputStream out = connection.getOutputStream()) { out.write(bytes); }
-            }
-            int status = connection.getResponseCode();
-            InputStream input = status < 400 ? connection.getInputStream() : connection.getErrorStream();
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            if (input != null) try (InputStream source = input) {
-                byte[] buffer = new byte[8192];
-                int n;
-                while ((n = source.read(buffer)) != -1) {
-                    if (bytes.size() + n > 2_000_000) throw new IllegalStateException("SmartPark response is too large.");
-                    bytes.write(buffer, 0, n);
-                }
-            }
-            JSONObject result = new JSONObject().put("status", status)
-                .put("body", new String(bytes.toByteArray(), StandardCharsets.UTF_8));
-            reply(id, result, null);
+            reply(id, SmartParkApi.request(payload.getString("url"), payload.optString("method", "GET"),
+                payload.getJSONObject("headers"), payload.optString("body", "")), null);
         } catch (Exception error) { reply(id, null, "SmartPark request failed: " + error.getMessage()); }
-        finally { if (connection != null) connection.disconnect(); }
     }
 
     @Override protected void onDestroy() {
