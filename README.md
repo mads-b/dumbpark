@@ -1,6 +1,6 @@
 # DumbPark
 
-A one-click app for the **Tieto Booking Sluppen P40** parking permit. The Electron app can sign in and book. The [GitHub Pages website](https://mads-b.github.io/dumbpark/) shares its interface and parking code, but SmartPark does not yet provide the browser sign-in callback it needs. The site clearly displays this limitation and does not pretend a booking was made.
+A one-click app for the **Tieto Booking Sluppen P40** parking permit. The Windows and Android apps can sign in and book. The [GitHub Pages website](https://mads-b.github.io/dumbpark/) shares its interface and parking code, but SmartPark does not yet provide the browser sign-in callback it needs. The site clearly displays this limitation and does not pretend a booking was made.
 
 ## Run
 
@@ -20,7 +20,21 @@ npm run build:web
 
 SmartPark's mobile API rejects ordinary browser user agents with `403 Unsupported Client`. Its verification page reports the challenge token through `window.webkit.messageHandlers`, which is available in Electron but not a normal browser. Its Cloudflare Turnstile site key is tied to SmartPark's domain. A gateway alone can handle the API's user-agent requirement, but it cannot supply a legitimate web verification callback. A supported SmartPark web login/API flow or vendor cooperation is needed before browser bookings can be enabled. A JavaScript-readable cookie would not solve sign-in and would expose its token to scripts on the same origin, so DumbPark does not store a token that way.
 
-The shared parking protocol, booking checks, and vehicle logic live in `shared/`; Electron's encrypted storage and verification window live in `desktop/`; the browser adapter lives in `web/`; and both modes render `ui/`. There are no duplicated booking rules.
+The shared parking protocol, booking checks, and vehicle logic live in `shared/`; Electron's encrypted storage and verification window live in `desktop/`; Android's geofences, notifications, encrypted storage, network bridge and verification window live in `android/`; the browser adapter lives in `web/`; and all three modes render `ui/`. There are no duplicated booking rules.
+
+## Android
+
+Build a test APK with Android SDK API 36, JDK 17, Node.js 22 and Gradle 8.13:
+
+```powershell
+npm ci
+npm run build:android-assets
+gradle -p android :app:assembleDebug
+```
+
+Install `android/app/build/outputs/apk/debug/app-debug.apk` on a device with Google Play services and a current Android System WebView. Sign in with SmartPark and choose a saved vehicle. Tap **Enable arrival reminders**, then allow notifications, precise location and **Allow all the time** location. The app monitors two 200 m circles centered on the parking lot (63.3994293, 10.3980961) and office (63.3984618, 10.3956557). After a five-minute dwell in either, it posts one local reminder per Oslo calendar day. Tapping that reminder opens DumbPark and invokes the same permit check and booking flow as the green button. No booking request is sent by the geofence receiver itself.
+
+Android may deliver geofence events a few minutes late, depending on location and battery settings. Location remains on the device; DumbPark sends SmartPark requests only after sign-in, manual permit checks or a booking tap. The APK published by the release workflow is **debug signed** for testing. To distribute a trusted production APK, configure a stable private release signing key in CI and change the workflow to build `assembleRelease`; never commit the key to this repository.
 
 ## Share with Windows users
 
@@ -33,7 +47,7 @@ npm run dist:win
 
 Share `dist/DumbPark-Setup.exe`. Recipients run the installer and open DumbPark from the Start menu or desktop shortcut; they do not need Node.js. The installer includes the app code and icon, but never the signed-in session or saved cars from your Windows profile. Sign in on each recipient's computer.
 
-For GitHub downloads, push a version tag matching `package.json` (for example, `v0.2.0` for version `0.2.0`). The release workflow builds the installer and adds it to GitHub Releases. Share the [latest release page](https://github.com/mads-b/dumbpark/releases/latest) or the [direct installer link](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Setup.exe).
+For GitHub downloads, push a version tag matching `package.json` (for example, `v0.3.0` for version `0.3.0`). The release workflow builds the Windows installer and Android test APK and adds both to GitHub Releases. Share the [latest release page](https://github.com/mads-b/dumbpark/releases/latest), the [direct installer link](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Setup.exe), or the [Android test APK](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Android-debug.apk).
 
 The installer is currently unsigned. For broad distribution, sign the Windows build so recipients do not encounter an untrusted publisher warning.
 

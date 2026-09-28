@@ -128,7 +128,8 @@ $('vehicle-plate').addEventListener('change', async () => {
   }
 });
 
-$('at-work').addEventListener('click', async () => {
+async function bookOnArrival() {
+  if (bookingInProgress) return;
   const button = $('at-work');
   button.disabled = true;
   bookingInProgress = true;
@@ -142,7 +143,21 @@ $('at-work').addEventListener('click', async () => {
     button.disabled = false;
     bookingInProgress = false;
   }
-});
+}
+$('at-work').addEventListener('click', bookOnArrival);
+
+if (window.dumbPark.capabilities?.arrivalReminders) {
+  $('android-reminders').hidden = false;
+  window.dumbPark.getReminderStatus().then(message => { $('reminder-status').textContent = message; });
+  $('enable-reminders').addEventListener('click', async () => {
+    const button = $('enable-reminders');
+    button.disabled = true;
+    try { $('reminder-status').textContent = await window.dumbPark.enableReminders(); }
+    catch (error) { $('reminder-status').textContent = error.message; }
+    finally { button.disabled = false; }
+  });
+  window.dumbPark.onBookingRequested(() => bookOnArrival());
+}
 
 $('request-code').addEventListener('click', async () => {
   const button = $('request-code');

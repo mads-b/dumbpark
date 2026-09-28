@@ -1,12 +1,13 @@
 {
   "name": "dumbpark",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Shared SmartPark permit app for Electron and the web",
+  "description": "Shared SmartPark permit app for Electron, Android and the web",
   "main": "desktop/main.cjs",
   "scripts": {
     "start": "electron .",
     "build:web": "node scripts/build-web.cjs",
+    "build:android-assets": "node scripts/build-android-assets.cjs",
     "icon": "node scripts/generate-icon.cjs",
     "dist:win": "electron-builder --win nsis --x64 --publish never",
     "test": "node --test desktop/test/*.test.cjs"

@@ -61,11 +61,11 @@ function assessVehiclePermit(permits, plateNumber, at = new Date()) {
   return state;
 }
 
-async function confirmPermit(client, attempts = 6) {
+async function confirmPermit(client, attempts = 6, at = new Date()) {
   for (let i = 0; i < attempts; i++) {
     if (i) await new Promise(resolve => setTimeout(resolve, client.confirmationDelayMs ?? 2000));
     try {
-      const state = assessMobilePermits(await client.getMyPermits());
+      const state = assessMobilePermits(await client.getMyPermits(), at);
       if (state.state === 'active') return state;
     } catch { /* A later read or the acquisition response may still confirm it. */ }
   }
@@ -134,7 +134,7 @@ async function bookTieto(client, { plateNumber, now = new Date() } = {}) {
   await client.persistSession?.();
   try { acquired = await client.acquirePermit(prepared.variantId, prepared.formData, globalThis.crypto.randomUUID()); }
   catch (error) {
-    const after = await confirmPermit(client);
+    const after = await confirmPermit(client, 6, now);
     if (after) {
       client.uncertainAcquisition = false;
       await client.persistSession?.();
@@ -146,7 +146,7 @@ async function bookTieto(client, { plateNumber, now = new Date() } = {}) {
     client.pendingOrderId = acquired.orderId;
     client.uncertainAcquisition = false;
     await client.persistSession?.();
-    const after = await confirmPermit(client);
+    const after = await confirmPermit(client, 6, now);
     if (after) {
       client.pendingOrderId = undefined;
       await client.persistSession?.();
