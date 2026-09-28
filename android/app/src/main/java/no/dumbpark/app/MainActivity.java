@@ -10,12 +10,14 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.WindowInsets;
+import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
@@ -57,7 +59,8 @@ public final class MainActivity extends Activity {
         dashboard.getSettings().setDomStorageEnabled(true);
         dashboard.getSettings().setAllowFileAccess(false);
         dashboard.getSettings().setAllowContentAccess(false);
-        dashboard.setOnApplyWindowInsetsListener((view, insets) -> {
+        FrameLayout frame = new FrameLayout(this);
+        frame.setOnApplyWindowInsetsListener((view, insets) -> {
             int top = Build.VERSION.SDK_INT >= 30 ? insets.getInsets(WindowInsets.Type.systemBars()).top : insets.getSystemWindowInsetTop();
             int bottom = Build.VERSION.SDK_INT >= 30 ? insets.getInsets(WindowInsets.Type.systemBars()).bottom : insets.getSystemWindowInsetBottom();
             view.setPadding(0, top, 0, bottom);
@@ -73,7 +76,8 @@ public final class MainActivity extends Activity {
                 return !LOCAL_ORIGIN.equals(request.getUrl().getScheme() + "://" + request.getUrl().getHost());
             }
         });
-        setContentView(dashboard);
+        frame.addView(dashboard, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(frame);
         dashboard.loadUrl(LOCAL_ORIGIN + "/assets/www/index.html");
     }
 
