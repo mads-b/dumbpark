@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -60,6 +61,11 @@ public final class MainActivity extends Activity {
         dashboard.getSettings().setAllowFileAccess(false);
         dashboard.getSettings().setAllowContentAccess(false);
         FrameLayout frame = new FrameLayout(this);
+        int background = Color.rgb(16, 21, 20);
+        frame.setBackgroundColor(background);
+        getWindow().getDecorView().setBackgroundColor(background);
+        getWindow().setStatusBarColor(background);
+        getWindow().setNavigationBarColor(background);
         frame.setOnApplyWindowInsetsListener((view, insets) -> {
             int top = Build.VERSION.SDK_INT >= 30 ? insets.getInsets(WindowInsets.Type.systemBars()).top : insets.getSystemWindowInsetTop();
             int bottom = Build.VERSION.SDK_INT >= 30 ? insets.getInsets(WindowInsets.Type.systemBars()).bottom : insets.getSystemWindowInsetBottom();

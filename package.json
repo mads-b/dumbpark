@@ -1,6 +1,6 @@
 {
   "name": "dumbpark",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "Shared SmartPark permit app for Electron, Android and the web",
   "main": "desktop/main.cjs",
