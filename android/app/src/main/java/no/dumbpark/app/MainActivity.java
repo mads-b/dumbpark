@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.WindowInsets;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -56,6 +57,12 @@ public final class MainActivity extends Activity {
         dashboard.getSettings().setDomStorageEnabled(true);
         dashboard.getSettings().setAllowFileAccess(false);
         dashboard.getSettings().setAllowContentAccess(false);
+        dashboard.setOnApplyWindowInsetsListener((view, insets) -> {
+            int top = Build.VERSION.SDK_INT >= 30 ? insets.getInsets(WindowInsets.Type.systemBars()).top : insets.getSystemWindowInsetTop();
+            int bottom = Build.VERSION.SDK_INT >= 30 ? insets.getInsets(WindowInsets.Type.systemBars()).bottom : insets.getSystemWindowInsetBottom();
+            view.setPadding(0, top, 0, bottom);
+            return insets;
+        });
         dashboard.addJavascriptInterface(new DashboardBridge(), "DumbParkNative");
         dashboard.setWebChromeClient(new WebChromeClient());
         dashboard.setWebViewClient(new WebViewClient() {

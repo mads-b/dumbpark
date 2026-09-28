@@ -8,6 +8,7 @@ const callbacks = { session: [], vehicles: [], focus: [], login: [], booking: []
 const pending = new Map();
 let nextId = 0;
 let pendingPhone;
+let initializationStarted = false;
 const emit = (kind, value) => { for (const callback of callbacks[kind]) callback(value); };
 
 function nativeCall(method, payload = {}) {
@@ -93,7 +94,13 @@ window.dumbPark = {
   },
   getReminderStatus: () => nativeCall('reminderStatus'),
   enableReminders: () => nativeCall('enableReminders'),
-  onSessionState: callback => callbacks.session.push(callback),
+  onSessionState: callback => {
+    callbacks.session.push(callback);
+    if (!initializationStarted) {
+      initializationStarted = true;
+      setTimeout(restoreSession, 0);
+    }
+  },
   onVehiclePlateState: callback => callbacks.vehicles.push(callback),
   onDashboardFocus: callback => callbacks.focus.push(callback),
   onLoginState: callback => callbacks.login.push(callback),
@@ -125,5 +132,3 @@ window.dumbParkNativeChallengeComplete = async token => {
     emit('login', { message: 'SMS code sent. Enter it in DumbPark.' });
   } catch (error) { emit('login', { message: error.message }); }
 };
-
-setTimeout(restoreSession, 0);

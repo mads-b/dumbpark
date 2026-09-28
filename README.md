@@ -47,7 +47,7 @@ npm run dist:win
 
 Share `dist/DumbPark-Setup.exe`. Recipients run the installer and open DumbPark from the Start menu or desktop shortcut; they do not need Node.js. The installer includes the app code and icon, but never the signed-in session or saved cars from your Windows profile. Sign in on each recipient's computer.
 
-For GitHub downloads, push a version tag matching `package.json` (for example, `v0.3.0` for version `0.3.0`). The release workflow builds the Windows installer and Android test APK and adds both to GitHub Releases. Share the [latest release page](https://github.com/mads-b/dumbpark/releases/latest), the [direct installer link](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Setup.exe), or the [Android test APK](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Android-debug.apk).
+For GitHub downloads, push a version tag matching `package.json` (for example, `v0.3.1` for version `0.3.1`). The release workflow builds the Windows installer and Android test APK and adds both to GitHub Releases. Share the [latest release page](https://github.com/mads-b/dumbpark/releases/latest), the [direct installer link](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Setup.exe), or the [Android test APK](https://github.com/mads-b/dumbpark/releases/latest/download/DumbPark-Android-debug.apk).
 
 The installer is currently unsigned. For broad distribution, sign the Windows build so recipients do not encounter an untrusted publisher warning.
 

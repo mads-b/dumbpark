@@ -22,6 +22,8 @@ test('Android reminder tap reaches the shared booking UI only after a native tap
     }
   } };
   vm.runInNewContext(bundle, { window, setTimeout });
+  // External scripts can yield to the event loop between adapter.js and renderer.js.
+  await new Promise(resolve => setTimeout(resolve, 20));
   const booked = [];
   const sessions = [];
   window.dumbPark.onBookingRequested(() => booked.push(true));
