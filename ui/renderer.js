@@ -7,6 +7,8 @@ let displayedResult;
 let signedInToSmartPark = false;
 let bookingInProgress = false;
 let focusRefreshPending = false;
+let reminderState = { enabled: false, setupPending: false };
+let reminderStatusRequest = 0;
 
 function showResult(result) {
   displayedResult = result;
@@ -148,14 +150,39 @@ $('at-work').addEventListener('click', bookOnArrival);
 
 if (window.dumbPark.capabilities?.arrivalReminders) {
   $('android-reminders').hidden = false;
-  window.dumbPark.getReminderStatus().then(message => { $('reminder-status').textContent = message; });
+  const showReminderState = state => {
+    reminderState = state;
+    $('reminder-status').textContent = state.message;
+    $('android-reminders').dataset.enabled = String(state.enabled);
+    const button = $('enable-reminders');
+    button.textContent = state.enabled ? 'Turn off arrival reminders'
+      : state.setupPending ? 'Finish enabling reminders' : 'Enable arrival reminders';
+    button.setAttribute('aria-pressed', String(state.enabled));
+  };
+  const refreshReminderStatus = async () => {
+    const request = ++reminderStatusRequest;
+    try {
+      const state = await window.dumbPark.getReminderStatus();
+      if (request === reminderStatusRequest) showReminderState(state);
+    } catch (error) {
+      if (request === reminderStatusRequest) $('reminder-status').textContent = error.message;
+    }
+  };
+  refreshReminderStatus();
   $('enable-reminders').addEventListener('click', async () => {
     const button = $('enable-reminders');
     button.disabled = true;
-    try { $('reminder-status').textContent = await window.dumbPark.enableReminders(); }
+    const request = ++reminderStatusRequest;
+    try {
+      const state = await (reminderState.enabled
+        ? window.dumbPark.disableReminders() : window.dumbPark.enableReminders());
+      if (request === reminderStatusRequest) showReminderState(state);
+    }
     catch (error) { $('reminder-status').textContent = error.message; }
     finally { button.disabled = false; }
   });
+  window.dumbPark.onReminderStateChanged(refreshReminderStatus);
+  window.dumbPark.onDashboardFocus(refreshReminderStatus);
   window.dumbPark.onBookingRequested(() => bookOnArrival());
 }
 

@@ -37,6 +37,7 @@ public final class ArrivalReminderWorker extends Worker {
     }
 
     private static synchronized void postNotification(Context context) {
+        if (!ArrivalGeofences.enabled(context) || !ArrivalGeofences.permissionsGranted(context)) return;
         if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
         String today = LocalDate.now(ZoneId.of("Europe/Oslo")).toString();
         android.content.SharedPreferences prefs = context.getSharedPreferences("arrival-reminders", Context.MODE_PRIVATE);

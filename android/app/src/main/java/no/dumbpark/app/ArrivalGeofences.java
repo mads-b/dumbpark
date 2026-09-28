@@ -24,6 +24,16 @@ final class ArrivalGeofences {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("enabled", false);
     }
 
+    static boolean setupPending(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("setup-pending", false);
+    }
+
+    static void setSetupPending(Context context, boolean pending) {
+        if (!context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("setup-pending", pending).commit()) {
+            throw new IllegalStateException("Could not save arrival reminder setup.");
+        }
+    }
+
     static boolean permissionsGranted(Context context) {
         if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return false;
         if (Build.VERSION.SDK_INT >= 29 && context.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) return false;
@@ -66,6 +76,12 @@ final class ArrivalGeofences {
     }
 
     static void setEnabled(Context context, boolean enabled) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("enabled", enabled).apply();
+        if (!context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("enabled", enabled).commit()) {
+            throw new IllegalStateException("Could not save arrival reminder setting.");
+        }
+    }
+
+    static void unregister(Context context) {
+        LocationServices.getGeofencingClient(context).removeGeofences(pendingIntent(context));
     }
 }

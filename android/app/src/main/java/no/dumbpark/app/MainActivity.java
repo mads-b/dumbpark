@@ -3,6 +3,7 @@ package no.dumbpark.app;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -22,6 +23,7 @@ import android.widget.FrameLayout;
 import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
+import androidx.work.WorkManager;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +43,7 @@ public final class MainActivity extends Activity {
     private AlertDialog challengeDialog;
     private SecureStore store;
     private String reminderCallId;
+    private boolean reminderRegistrationInProgress;
     private boolean pendingBooking;
 
     @Override public void onCreate(Bundle state) {
@@ -84,6 +87,7 @@ public final class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         if (dashboard != null) dashboard.evaluateJavascript("window.dumbParkNativeFocus?.()", null);
+        if (ArrivalGeofences.setupPending(this) && ArrivalGeofences.permissionsGranted(this)) continueReminderSetup();
     }
 
     @Override protected void onNewIntent(Intent intent) {
@@ -106,15 +110,23 @@ public final class MainActivity extends Activity {
         } catch (Exception ignored) { }
     }
 
-    private String reminderStatus() {
-        if (!ArrivalGeofences.playServicesAvailable(this)) return "Google Play services is needed for arrival reminders.";
-        if (!ArrivalGeofences.enabled(this)) return "Arrival reminders are off.";
-        if (!ArrivalGeofences.permissionsGranted(this)) return "Arrival reminders need precise, always-on location and notifications. Tap Enable to grant them.";
-        return "On: 200 m around the parking lot and office, after five minutes inside.";
+    private JSONObject reminderStatus() throws Exception {
+        boolean available = ArrivalGeofences.playServicesAvailable(this);
+        boolean permissions = ArrivalGeofences.permissionsGranted(this);
+        boolean enabled = ArrivalGeofences.enabled(this);
+        boolean pending = ArrivalGeofences.setupPending(this);
+        String message;
+        if (!available) message = "Google Play services is needed for arrival reminders.";
+        else if (enabled && !permissions) message = "Arrival reminders need precise, always-on location and notifications. Tap Enable to restore them.";
+        else if (enabled) message = "On: 200 m around the parking lot and office, after five minutes inside.";
+        else if (pending) message = "Finish the permission setup to turn on arrival reminders.";
+        else message = "Arrival reminders are off.";
+        return new JSONObject().put("enabled", available && permissions && enabled)
+            .put("setupPending", pending).put("message", message);
     }
 
     private void continueReminderSetup() {
-        if (reminderCallId == null) return;
+        if ((!ArrivalGeofences.setupPending(this) && reminderCallId == null) || reminderRegistrationInProgress) return;
         if (!ArrivalGeofences.playServicesAvailable(this)) { finishReminder("Google Play services is unavailable on this device."); return; }
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, ASK_NOTIFICATIONS); return;
@@ -138,19 +150,34 @@ public final class MainActivity extends Activity {
             return;
         }
         try {
+            reminderRegistrationInProgress = true;
             ArrivalGeofences.register(this, task -> {
-                if (task.isSuccessful()) {
-                    ArrivalGeofences.setEnabled(this, true);
-                    finishReminder(reminderStatus());
-                } else finishReminder("Could not register arrival reminders: " + task.getException().getMessage());
+                reminderRegistrationInProgress = false;
+                try {
+                    if (task.isSuccessful()) {
+                        ArrivalGeofences.setEnabled(this, true);
+                        finishReminder(null);
+                    } else finishReminder("Could not register arrival reminders: " + task.getException().getMessage());
+                } catch (Exception error) { finishReminder(error.getMessage()); }
             });
-        } catch (Exception error) { finishReminder(error.getMessage()); }
+        } catch (Exception error) {
+            reminderRegistrationInProgress = false;
+            finishReminder(error.getMessage());
+        }
     }
 
     private void finishReminder(String message) {
         String id = reminderCallId;
         reminderCallId = null;
-        if (id != null) reply(id, message, null);
+        try {
+            ArrivalGeofences.setSetupPending(this, false);
+            JSONObject status = reminderStatus();
+            if (message != null) status.put("message", message);
+            if (id != null) reply(id, status, null);
+            js("window.dumbParkNativeReminderChanged?.()");
+        } catch (Exception error) {
+            if (id != null) reply(id, null, error.getMessage());
+        }
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grants) {
@@ -231,8 +258,28 @@ public final class MainActivity extends Activity {
                     }); break;
                     case "reminderStatus": reply(id, reminderStatus(), null); break;
                     case "enableReminders": runOnUiThread(() -> {
-                        reminderCallId = id;
-                        continueReminderSetup();
+                        try {
+                            if (ArrivalGeofences.enabled(MainActivity.this) && ArrivalGeofences.permissionsGranted(MainActivity.this) &&
+                                ArrivalGeofences.playServicesAvailable(MainActivity.this)) {
+                                reply(id, reminderStatus(), null);
+                            } else {
+                                ArrivalGeofences.setEnabled(MainActivity.this, false);
+                                ArrivalGeofences.setSetupPending(MainActivity.this, true);
+                                reminderCallId = id;
+                                continueReminderSetup();
+                            }
+                        } catch (Exception error) { reply(id, null, error.getMessage()); }
+                    }); break;
+                    case "disableReminders": runOnUiThread(() -> {
+                        try {
+                            ArrivalGeofences.setEnabled(MainActivity.this, false);
+                            ArrivalGeofences.setSetupPending(MainActivity.this, false);
+                            WorkManager.getInstance(MainActivity.this).cancelUniqueWork("arrival-permit-check");
+                            getSystemService(NotificationManager.class).cancel(40);
+                            try { ArrivalGeofences.unregister(MainActivity.this); } catch (Exception ignored) { }
+                            reply(id, reminderStatus(), null);
+                            js("window.dumbParkNativeReminderChanged?.()");
+                        } catch (Exception error) { reply(id, null, error.getMessage()); }
                     }); break;
                     case "consumeBookingIntent": runOnUiThread(() -> {
                         boolean value = pendingBooking;

@@ -4,7 +4,7 @@ const { MobileClient } = require('../shared/mobile.cjs');
 const { ParkingService } = require('../shared/parking-service.cjs');
 const { parseVehicles, emptyVehicles } = require('../shared/vehicles.cjs');
 
-const callbacks = { session: [], vehicles: [], focus: [], login: [], booking: [] };
+const callbacks = { session: [], vehicles: [], focus: [], login: [], booking: [], reminders: [] };
 const pending = new Map();
 let nextId = 0;
 let pendingPhone;
@@ -65,6 +65,7 @@ window.dumbParkNativeBookRequested = async () => {
   if (shouldBook) emit('booking');
 };
 window.dumbParkNativeFocus = () => emit('focus');
+window.dumbParkNativeReminderChanged = () => emit('reminders');
 
 window.dumbPark = {
   capabilities: { canSignIn: true, arrivalReminders: true },
@@ -98,6 +99,7 @@ window.dumbPark = {
   },
   getReminderStatus: () => nativeCall('reminderStatus'),
   enableReminders: () => nativeCall('enableReminders'),
+  disableReminders: () => nativeCall('disableReminders'),
   onSessionState: callback => {
     callbacks.session.push(callback);
     if (!initializationStarted) {
@@ -108,7 +110,8 @@ window.dumbPark = {
   onVehiclePlateState: callback => callbacks.vehicles.push(callback),
   onDashboardFocus: callback => callbacks.focus.push(callback),
   onLoginState: callback => callbacks.login.push(callback),
-  onBookingRequested: callback => callbacks.booking.push(callback)
+  onBookingRequested: callback => callbacks.booking.push(callback),
+  onReminderStateChanged: callback => callbacks.reminders.push(callback)
 };
 
 async function restoreSession() {
