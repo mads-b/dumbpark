@@ -60,13 +60,9 @@ final class SmartParkApi {
         } finally { connection.disconnect(); }
     }
 
-    static JSONObject authenticated(String path, String method, String token, String body) throws Exception {
+    static JSONObject sessionRequest(String path, String method, String token, String body) throws Exception {
         if (path == null || path.isEmpty() || path.contains("..")) throw new IllegalArgumentException("Invalid SmartPark path.");
         URL url = new URL(new URL(ORIGIN + "/"), path);
-        JSONObject response = request(url.toString(), method, headers(token), body);
-        if (response.getInt("status") != 200) throw new IllegalStateException("SmartPark permit check failed.");
-        JSONObject data = new JSONObject(response.getString("body"));
-        if (!"SUCCESS".equals(data.optString("resultCode"))) throw new IllegalStateException("SmartPark permit check failed.");
-        return data;
+        return request(url.toString(), method, headers(token), body);
     }
 }

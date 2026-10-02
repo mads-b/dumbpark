@@ -13,6 +13,7 @@ let reminderStatusRequest = 0;
 function showResult(result) {
   displayedResult = result;
   const state = result?.state || 'error';
+  if (state === 'needs-sign-in') showSignedIn(false);
   $('result').dataset.state = state;
   $('result').textContent = result?.message || 'SmartPark did not return a booking status.';
 }

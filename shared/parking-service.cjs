@@ -2,6 +2,7 @@
 
 const { assessMobilePermits, assessVehiclePermit, plateFromPermits, validPlate, bookTieto } = require('./booking.cjs');
 const { emptyVehicles, addVehicle, selectVehicle } = require('./vehicles.cjs');
+const { SessionExpiredError } = require('./mobile.cjs');
 
 class ParkingService {
   constructor(client, { vehicles = emptyVehicles(), saveVehicles = async () => {}, saveSession = async () => {} } = {}) {
@@ -38,6 +39,7 @@ class ParkingService {
       await this.saveSession().catch(() => false);
       return result;
     } catch (error) {
+      if (error instanceof SessionExpiredError) return { state: 'needs-sign-in', message: error.message };
       return { state: 'error', message: `Booking stopped: ${error.message}` };
     }
   }
@@ -55,6 +57,7 @@ class ParkingService {
       }
       return state;
     } catch (error) {
+      if (error instanceof SessionExpiredError) return { state: 'needs-sign-in', message: error.message };
       return { state: 'unknown', message: `Could not check your parking status: ${error.message}` };
     }
   }
@@ -72,6 +75,7 @@ class ParkingService {
 
   clearSession() {
     this.client.token = undefined;
+    this.client.refreshToken = undefined;
     this.client.productsService = undefined;
     this.client.pendingOrderId = undefined;
     this.client.uncertainAcquisition = false;

@@ -55,6 +55,8 @@ The icon source is `ui/assets/dumbpark.svg`. Run `npm run icon` after changing i
 
 Sign in to SmartPark with your phone number and SMS code if prompted. DumbPark saves the session and your vehicle plates encrypted for your Windows account. Use **+** to add a car and the dropdown to choose which one to book. **Sign out of SmartPark** clears the saved session and cars.
 
+From version 0.3.6, the Windows and Android apps also save SmartPark's refresh token in encrypted storage. When SmartPark rejects an expired access token (HTTP 401 or `SESSION_NOT_FOUND`), the app renews it through `client/reauth`, saves the replacement, and retries the rejected request once. Android's background arrival check renews its session too. Network failures retain the saved login and never cause a booking retry. Revoked sessions still require SMS sign-in. Upgrading from 0.3.5 or earlier requires one new SMS sign-in, since those versions discarded the refresh token returned by SmartPark.
+
 When signed in, DumbPark checks for an active Tieto permit at startup and highlights a missing booking in red. When you arrive at work, click **I'm at work now**. DumbPark checks the permit again. If none exists, it finds the current product, verifies that the option is free and available for today's Oslo date, then sends one booking request for the selected car. It waits for SmartPark to confirm the permit and blocks a second request while the outcome is pending.
 
 When the window regains focus or the laptop wakes, DumbPark checks the displayed permit's expiry immediately. An expired permit switches to the red booking prompt while the app checks SmartPark for a newer one.

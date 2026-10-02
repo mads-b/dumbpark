@@ -127,7 +127,7 @@ async function bookTieto(client, { plateNumber, now = new Date() } = {}) {
   const prepared = await prepareTieto(client, permits, plateNumber, now);
   if (prepared.state !== 'ready') return prepared;
 
-  // The acquisition request has a fresh idempotency key and is never retried.
+  // Acquisition keeps one idempotency key; only an explicit auth rejection permits a retry.
   // If its response is lost, read the permit list before reporting uncertainty.
   let acquired;
   client.uncertainAcquisition = true;

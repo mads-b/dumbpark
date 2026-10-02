@@ -1,6 +1,6 @@
 'use strict';
 
-const { MobileClient } = require('../shared/mobile.cjs');
+const { MobileClient, SessionExpiredError } = require('../shared/mobile.cjs');
 const { ParkingService } = require('../shared/parking-service.cjs');
 const { parseVehicles, emptyVehicles } = require('../shared/vehicles.cjs');
 
@@ -40,6 +40,8 @@ const client = new MobileClient(nativeFetch);
 let saved = {};
 try { saved = JSON.parse(window.DumbParkNative.readState() || '{}'); } catch { /* Start signed out. */ }
 client.token = saved.session?.token || undefined;
+client.refreshToken = saved.session?.refreshToken || undefined;
+client.productsService = saved.session?.productsService || undefined;
 client.pendingOrderId = saved.session?.pendingOrderId || undefined;
 client.uncertainAcquisition = Boolean(saved.session?.uncertainAcquisition);
 let permitListPath = saved.session?.pathToMyPermits || null;
@@ -47,7 +49,8 @@ let vehicles = parseVehicles(saved.vehicles);
 
 function persist() {
   const result = window.DumbParkNative.writeState(JSON.stringify({
-    session: { token: client.token, pendingOrderId: client.pendingOrderId,
+    session: { token: client.token, refreshToken: client.refreshToken,
+      productsService: client.productsService, pendingOrderId: client.pendingOrderId,
       uncertainAcquisition: client.uncertainAcquisition,
       pathToMyPermits: client.productsService?.pathToMyPermits || permitListPath }, vehicles
   }));
@@ -117,18 +120,19 @@ window.dumbPark = {
 async function restoreSession() {
   if (client.token) {
     try {
-      const account = await client.request('client/account', { authenticated: true });
-      client.productsService = account.parkingServices?.[0]?.clientServices?.products;
-      if (!client.productsService?.pathToPermitShops) throw new Error('Permit shop unavailable.');
+      await client.loadAccount();
       permitListPath = client.productsService.pathToMyPermits || null;
       persist();
-    } catch {
-      client.token = undefined;
-      client.productsService = undefined;
-      client.pendingOrderId = undefined;
-      client.uncertainAcquisition = false;
-      permitListPath = null;
-      persist();
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        client.token = undefined;
+        client.refreshToken = undefined;
+        client.productsService = undefined;
+        client.pendingOrderId = undefined;
+        client.uncertainAcquisition = false;
+        permitListPath = null;
+        persist();
+      }
     }
   }
   emit('vehicles', service.vehicles);

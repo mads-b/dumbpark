@@ -7,8 +7,8 @@ android {
         applicationId = "no.dumbpark.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.3.5"
+        versionCode = 7
+        versionName = "0.3.6"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

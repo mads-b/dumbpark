@@ -22,13 +22,14 @@ final class PermitReminderChecker {
         if (session == null) return false;
         String token = session.optString("token", "");
         if (token.isEmpty()) return false;
+        SmartParkSession client = new SmartParkSession(SmartParkApi::sessionRequest, new SecureStore(context));
         String path = session.optString("pathToMyPermits", "");
         if (path.isEmpty()) {
-            JSONObject account = SmartParkApi.authenticated("client/account", "GET", token, null);
+            JSONObject account = client.request("client/account", "GET", null);
             path = account.getJSONArray("parkingServices").getJSONObject(0)
                 .getJSONObject("clientServices").getJSONObject("products").getString("pathToMyPermits");
         }
-        JSONObject response = SmartParkApi.authenticated(path, "POST", token, "\"\"");
+        JSONObject response = client.request(path, "POST", "\"\"");
         JSONObject vehicles = saved.optJSONObject("vehicles");
         String selectedPlate = vehicles == null ? "" : normalizedPlate(vehicles.optString("selectedPlate", ""));
         return confirmedMissing(response.getJSONArray("permits"), selectedPlate, System.currentTimeMillis());

@@ -4,18 +4,26 @@ const ORIGIN = 'https://parko.giantleap.no';
 const PARTNER = 'trondheimparkering';
 const USER_AGENT = 'Android/Cardboard(trondheimparkering-4.11.6)/1.3.39';
 const TARGET = 'tieto booking sluppen p40';
+// Public app identifier from SmartPark's ReAuthRequest, not an account secret.
+const CLIENT_IDENTIFIER = 'SNWKJJSP7NZ4J1DY';
+
+class SessionExpiredError extends Error {
+  constructor() { super('SmartPark sign-in expired. Please sign in again.'); }
+}
 
 class MobileClient {
   constructor(fetcher = fetch) {
     this.fetcher = fetcher;
     this.token = undefined;
+    this.refreshToken = undefined;
+    this.refreshPromise = undefined;
     this.phoneNumber = undefined;
     this.productsService = undefined;
     this.pendingOrderId = undefined;
     this.uncertainAcquisition = false;
   }
 
-  async request(path, { method = 'GET', body, authenticated = false, idempotencyKey } = {}) {
+  async request(path, { method = 'GET', body, authenticated = false, idempotencyKey, retryAuth = true } = {}) {
     if (typeof path !== 'string' || !path || /^\w+:/.test(path) || path.includes('..')) {
       throw new Error('SmartPark returned an invalid service path.');
     }
@@ -38,10 +46,50 @@ class MobileClient {
     });
     let data;
     try { data = await response.json(); } catch { data = {}; }
+    // Only retry an explicit authentication rejection, never a lost booking response.
+    if (authenticated && (response.status === 401 || data.errorCode === 'SESSION_NOT_FOUND')) {
+      if (retryAuth && this.refreshToken) {
+        await this.reauthenticate(headers['X-Token']);
+        return this.request(path, { method, body, authenticated, idempotencyKey, retryAuth: false });
+      }
+      throw new SessionExpiredError();
+    }
     if (!response.ok || data.resultCode !== 'SUCCESS') {
       throw new Error(`SmartPark permit service returned ${data.errorCode || `HTTP ${response.status}`}.`);
     }
     return data;
+  }
+
+  async reauthenticate(rejectedToken) {
+    if (this.token !== rejectedToken) return;
+    if (!this.refreshPromise) {
+      const refreshToken = this.refreshToken;
+      this.refreshPromise = (async () => {
+        const data = await this.request('client/reauth', {
+          method: 'POST', authenticated: true, retryAuth: false,
+          body: { refreshToken, clientIdentifier: CLIENT_IDENTIFIER }
+        });
+        if (typeof data.token !== 'string' || !data.token) {
+          throw new Error('SmartPark did not return a renewed session token.');
+        }
+        // A sign-out or new sign-in during renewal must not resurrect the old session.
+        if (this.refreshToken !== refreshToken || this.token !== rejectedToken) {
+          throw new SessionExpiredError();
+        }
+        this.token = data.token;
+        await this.persistSession?.();
+      })();
+    }
+    try { await this.refreshPromise; }
+    finally { this.refreshPromise = undefined; }
+  }
+
+  async loadAccount() {
+    const account = await this.request('client/account', { authenticated: true });
+    const service = account.parkingServices?.[0]?.clientServices?.products;
+    if (!service?.pathToPermitShops) throw new Error('SmartPark did not expose a permit shop for this account.');
+    this.productsService = service;
+    return service;
   }
 
   async getChallengeUrl() {
@@ -74,6 +122,7 @@ class MobileClient {
       throw new Error('SmartPark did not return a session token.');
     }
     this.token = data.token;
+    this.refreshToken = typeof data.refreshToken === 'string' && data.refreshToken ? data.refreshToken : undefined;
     const service = data.parkingServices?.[0]?.clientServices?.products;
     this.productsService = service || (await this.request('client/account', { authenticated: true }))
       .parkingServices?.[0]?.clientServices?.products;
@@ -133,6 +182,7 @@ class MobileClient {
   }
 
   async getMyPermits() {
+    if (!this.productsService) await this.loadAccount();
     if (!this.productsService?.pathToMyPermits) {
       throw new Error('SmartPark did not expose your permits to this session.');
     }
@@ -173,4 +223,4 @@ class MobileClient {
   }
 }
 
-module.exports = { MobileClient };
+module.exports = { MobileClient, SessionExpiredError };

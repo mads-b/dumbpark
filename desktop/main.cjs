@@ -4,7 +4,7 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const { app, BrowserWindow, ipcMain, powerMonitor, safeStorage } = require('electron');
 const { plateFromPermits, validPlate } = require('../shared/booking.cjs');
-const { MobileClient } = require('../shared/mobile.cjs');
+const { MobileClient, SessionExpiredError } = require('../shared/mobile.cjs');
 const { emptyVehicles, addVehicle, parseVehicles } = require('../shared/vehicles.cjs');
 const { ParkingService } = require('../shared/parking-service.cjs');
 
@@ -51,6 +51,8 @@ async function saveMobileSession() {
   if (!safeStorage.isEncryptionAvailable()) return false;
   const encrypted = safeStorage.encryptString(JSON.stringify({
     token: mobileClient.token,
+    refreshToken: mobileClient.refreshToken,
+    productsService: mobileClient.productsService,
     pendingOrderId: mobileClient.pendingOrderId || null,
     uncertainAcquisition: mobileClient.uncertainAcquisition
   }));
@@ -64,14 +66,18 @@ async function restoreMobileSession() {
     const stored = safeStorage.decryptString(await fs.readFile(sessionFile()));
     const saved = stored.startsWith('{') ? JSON.parse(stored) : { token: stored };
     mobileClient.token = saved.token;
+    mobileClient.refreshToken = saved.refreshToken;
+    mobileClient.productsService = saved.productsService;
     mobileClient.pendingOrderId = saved.pendingOrderId || undefined;
     mobileClient.uncertainAcquisition = Boolean(saved.uncertainAcquisition);
-    const account = await mobileClient.request('client/account', { authenticated: true });
-    mobileClient.productsService = account.parkingServices?.[0]?.clientServices?.products;
-    if (!mobileClient.productsService?.pathToPermitShops) throw new Error('Permit shop unavailable.');
+    await mobileClient.loadAccount();
+    await saveMobileSession();
     return true;
-  } catch {
+  } catch (error) {
+    // Keep the encrypted session through connectivity failures so the next click can retry.
+    if (mobileClient.token && !(error instanceof SessionExpiredError)) return true;
     mobileClient.token = undefined;
+    mobileClient.refreshToken = undefined;
     mobileClient.productsService = undefined;
     mobileClient.pendingOrderId = undefined;
     mobileClient.uncertainAcquisition = false;

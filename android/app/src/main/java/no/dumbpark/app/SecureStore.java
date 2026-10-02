@@ -10,8 +10,10 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
+import org.json.JSONObject;
 
-final class SecureStore {
+final class SecureStore implements SmartParkSession.StateStore {
+    private static final Object LOCK = new Object();
     private static final String ALIAS = "dumbpark-session-v1";
     private static final String PREFS = "secure-state";
     private final Context context;
@@ -32,7 +34,9 @@ final class SecureStore {
         return generator.generateKey();
     }
 
-    synchronized String read() {
+    public String read() { synchronized (LOCK) { return readLocked(); } }
+
+    private String readLocked() {
         String encoded = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("state", null);
         if (encoded == null) return "{}";
         try {
@@ -46,7 +50,25 @@ final class SecureStore {
         } catch (Exception ignored) { return "{}"; }
     }
 
-    synchronized void write(String plain) throws Exception {
+    void write(String plain) throws Exception { synchronized (LOCK) { writeLocked(plain); } }
+
+    public String renewToken(String refreshToken, String rejectedToken, String newToken) throws Exception {
+        synchronized (LOCK) {
+            JSONObject state = new JSONObject(readLocked());
+            JSONObject session = state.optJSONObject("session");
+            if (session == null || !refreshToken.equals(session.optString("refreshToken"))) {
+                throw new IllegalStateException("SmartPark session changed during renewal.");
+            }
+            String currentToken = session.optString("token", "");
+            if (currentToken.isEmpty()) throw new IllegalStateException("SmartPark sign-in required.");
+            if (!rejectedToken.equals(currentToken)) return currentToken;
+            session.put("token", newToken);
+            writeLocked(state.toString());
+            return newToken;
+        }
+    }
+
+    private void writeLocked(String plain) throws Exception {
         if (plain == null || plain.length() > 65536) throw new IllegalArgumentException("Invalid saved state.");
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.ENCRYPT_MODE, key());
