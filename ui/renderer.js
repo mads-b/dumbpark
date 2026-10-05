@@ -155,6 +155,9 @@ if (window.dumbPark.capabilities?.arrivalReminders) {
     reminderState = state;
     $('reminder-status').textContent = state.message;
     $('android-reminders').dataset.enabled = String(state.enabled);
+    $('android-reminders').dataset.healthy = String(state.healthy ?? state.enabled);
+    $('reminder-details').textContent = state.details || 'No reminder diagnostics are available.';
+    $('repair-reminders').hidden = !(state.requestedEnabled ?? state.enabled);
     const button = $('enable-reminders');
     button.textContent = state.enabled ? 'Turn off arrival reminders'
       : state.setupPending ? 'Finish enabling reminders' : 'Enable arrival reminders';
@@ -183,6 +186,20 @@ if (window.dumbPark.capabilities?.arrivalReminders) {
     finally { button.disabled = false; }
   });
   window.dumbPark.onReminderStateChanged(refreshReminderStatus);
+  $('repair-reminders').addEventListener('click', async () => {
+    const button = $('repair-reminders');
+    button.disabled = true;
+    const request = ++reminderStatusRequest;
+    try {
+      const state = await window.dumbPark.repairReminders();
+      if (request === reminderStatusRequest) showReminderState(state);
+    } catch (error) { $('reminder-status').textContent = error.message; }
+    finally { button.disabled = false; }
+  });
+  $('reminder-settings').addEventListener('click', async () => {
+    try { await window.dumbPark.openReminderSettings(); }
+    catch (error) { $('reminder-status').textContent = error.message; }
+  });
   window.dumbPark.onDashboardFocus(refreshReminderStatus);
   window.dumbPark.onBookingRequested(() => bookOnArrival());
 }

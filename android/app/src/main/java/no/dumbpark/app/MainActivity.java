@@ -45,6 +45,7 @@ public final class MainActivity extends Activity {
     private String reminderCallId;
     private boolean reminderRegistrationInProgress;
     private boolean pendingBooking;
+    private boolean restoreRemindersOnResume = true;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -88,6 +89,9 @@ public final class MainActivity extends Activity {
         super.onResume();
         if (dashboard != null) dashboard.evaluateJavascript("window.dumbParkNativeFocus?.()", null);
         if (ArrivalGeofences.setupPending(this) && ArrivalGeofences.permissionsGranted(this)) continueReminderSetup();
+        else if (ArrivalGeofences.enabled(this) && ArrivalGeofences.permissionsGranted(this) &&
+            (restoreRemindersOnResume || ArrivalGeofences.needsRecovery(this))) recoverReminders(null);
+        restoreRemindersOnResume = false;
     }
 
     @Override protected void onNewIntent(Intent intent) {
@@ -115,14 +119,48 @@ public final class MainActivity extends Activity {
         boolean permissions = ArrivalGeofences.permissionsGranted(this);
         boolean enabled = ArrivalGeofences.enabled(this);
         boolean pending = ArrivalGeofences.setupPending(this);
+        boolean location = ArrivalDiagnostics.locationEnabled(this);
+        boolean notifications = ArrivalDiagnostics.notificationsEnabled(this);
+        boolean restricted = ArrivalDiagnostics.backgroundRestricted(this);
         String message;
         if (!available) message = "Google Play services is needed for arrival reminders.";
         else if (enabled && !permissions) message = "Arrival reminders need precise, always-on location and notifications. Tap Enable to restore them.";
-        else if (enabled) message = "On: 200 m around the parking lot and office, after five minutes inside.";
+        else if (enabled && !location) message = "Enabled, but device location is off. Turn it on in Android settings.";
+        else if (enabled && !notifications) message = "Enabled, but Android is blocking notifications. Check Android settings.";
+        else if (enabled && ArrivalGeofences.needsRecovery(this)) message = "Enabled, but geofence registration needs recovery. Tap Re-arm reminders.";
+        else if (enabled && restricted) message = "Enabled, but Android restricts background activity. Check battery settings.";
+        else if (enabled) message = "Enabled: 200 m around the lot and office, after five minutes inside. See the last registration result below.";
         else if (pending) message = "Finish the permission setup to turn on arrival reminders.";
         else message = "Arrival reminders are off.";
         return new JSONObject().put("enabled", available && permissions && enabled)
-            .put("setupPending", pending).put("message", message);
+            .put("requestedEnabled", enabled).put("setupPending", pending).put("message", message)
+            .put("healthy", available && permissions && enabled && location && notifications && !restricted && !ArrivalGeofences.needsRecovery(this))
+            .put("details", ArrivalDiagnostics.summary(this));
+    }
+
+    private void recoverReminders(String id) {
+        if (!ArrivalGeofences.enabled(this) || !ArrivalGeofences.permissionsGranted(this) || reminderRegistrationInProgress) {
+            try { if (id != null) reply(id, reminderStatus(), null); } catch (Exception ignored) { }
+            return;
+        }
+        reminderRegistrationInProgress = true;
+        try {
+            ArrivalGeofences.register(this, task -> {
+                reminderRegistrationInProgress = false;
+                try {
+                    if (!ArrivalGeofences.enabled(this)) ArrivalGeofences.unregister(this);
+                    if (!task.isSuccessful()) GeofenceRecoveryWorker.schedule(this, "registration failed while opening the app");
+                    if (id != null) reply(id, reminderStatus(), null);
+                    js("window.dumbParkNativeReminderChanged?.()");
+                } catch (Exception ignored) { if (id != null) reply(id, null, "Could not re-arm reminders."); }
+            });
+        } catch (Exception ignored) {
+            reminderRegistrationInProgress = false;
+            ArrivalDiagnostics.prefs(this).edit().putBoolean("registration-ok", false).apply();
+            ArrivalDiagnostics.record(this, "registration", "Recovery could not start; check Google Play services and device location.");
+            GeofenceRecoveryWorker.schedule(this, "location service unavailable while opening the app");
+            try { if (id != null) reply(id, reminderStatus(), null); } catch (Exception ignoredAgain) { }
+        }
     }
 
     private void continueReminderSetup() {
@@ -257,6 +295,13 @@ public final class MainActivity extends Activity {
                         catch (Exception error) { reply(id, null, error.getMessage()); }
                     }); break;
                     case "reminderStatus": reply(id, reminderStatus(), null); break;
+                    case "repairReminders": runOnUiThread(() -> recoverReminders(id)); break;
+                    case "openReminderSettings": runOnUiThread(() -> {
+                        try {
+                            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+                            reply(id, true, null);
+                        } catch (Exception ignored) { reply(id, null, "Could not open Android settings."); }
+                    }); break;
                     case "enableReminders": runOnUiThread(() -> {
                         try {
                             if (ArrivalGeofences.enabled(MainActivity.this) && ArrivalGeofences.permissionsGranted(MainActivity.this) &&
@@ -275,6 +320,7 @@ public final class MainActivity extends Activity {
                             ArrivalGeofences.setEnabled(MainActivity.this, false);
                             ArrivalGeofences.setSetupPending(MainActivity.this, false);
                             WorkManager.getInstance(MainActivity.this).cancelUniqueWork("arrival-permit-check");
+                            WorkManager.getInstance(MainActivity.this).cancelUniqueWork(GeofenceRecoveryWorker.WORK);
                             getSystemService(NotificationManager.class).cancel(40);
                             try { ArrivalGeofences.unregister(MainActivity.this); } catch (Exception ignored) { }
                             reply(id, reminderStatus(), null);

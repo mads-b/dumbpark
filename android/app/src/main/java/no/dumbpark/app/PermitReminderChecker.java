@@ -19,9 +19,9 @@ final class PermitReminderChecker {
     static boolean confirmedMissing(Context context) throws Exception {
         JSONObject saved = new JSONObject(new SecureStore(context).read());
         JSONObject session = saved.optJSONObject("session");
-        if (session == null) return false;
+        if (session == null) throw new SmartParkSession.SignInRequiredException();
         String token = session.optString("token", "");
-        if (token.isEmpty()) return false;
+        if (token.isEmpty()) throw new SmartParkSession.SignInRequiredException();
         SmartParkSession client = new SmartParkSession(SmartParkApi::sessionRequest, new SecureStore(context));
         String path = session.optString("pathToMyPermits", "");
         if (path.isEmpty()) {

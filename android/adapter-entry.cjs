@@ -103,6 +103,8 @@ window.dumbPark = {
   getReminderStatus: () => nativeCall('reminderStatus'),
   enableReminders: () => nativeCall('enableReminders'),
   disableReminders: () => nativeCall('disableReminders'),
+  repairReminders: () => nativeCall('repairReminders'),
+  openReminderSettings: () => nativeCall('openReminderSettings'),
   onSessionState: callback => {
     callbacks.session.push(callback);
     if (!initializationStarted) {

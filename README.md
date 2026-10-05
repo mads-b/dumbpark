@@ -36,6 +36,10 @@ Install `android/app/build/outputs/apk/debug/app-debug.apk` on a device with Goo
 
 Android may deliver geofence events a few minutes late, depending on location and battery settings. Location remains on the device; DumbPark also makes a read-only SmartPark permit request after a geofence dwell. The APK published by the release workflow is **debug signed** for testing. To distribute a trusted production APK, configure a stable private release signing key in CI and change the workflow to build `assembleRelease`; never commit the key to this repository.
 
+From 0.3.7, enabled reminders re-register their geofences when the app reopens, after reboot or an app update, and recover from a geofence-service error with bounded retries. A temporary network/API error retries only that arrival's permit check up to three times, within 20 minutes; there is no periodic permit polling. **Reminder health** shows device location, notification/background restrictions and the last registration, arrival, check and notification milestones. These diagnostics stay on the device and contain no coordinates, vehicle plates, credentials or API response bodies. **Re-arm reminders** registers the fences again without contacting SmartPark. The registration status is its last known result; Android has no API to query the current geofence inventory.
+
+On Samsung phones, add DumbPark to **Settings → Battery → Background usage limits → Never sleeping apps**, removing it from Sleeping/Deep sleeping apps if present. Sleeping-list membership is not exposed through the standard Android background-restriction API, so a healthy-looking status cannot rule it out. Android settings must allow precise location **all the time** and notifications. Force-stopping the app prevents background delivery until it is opened again; re-registration cannot bypass an OS restriction while the app is stopped.
+
 ## Share with Windows users
 
 Build the one-click Windows installer on a Windows computer:

@@ -3,6 +3,7 @@ package no.dumbpark.app;
 import static org.junit.Assert.*;
 import org.json.JSONObject;
 import org.junit.Test;
+import java.io.IOException;
 
 public final class SmartParkSessionTest {
     private static JSONObject response(int status, String body) throws Exception {
@@ -52,7 +53,7 @@ public final class SmartParkSessionTest {
             calls[0]++;
             return response(401, "{}");
         }, new MemoryStore());
-        assertThrows(IllegalStateException.class, () -> client.request("permit/list", "POST", "\"\""));
+        assertThrows(SmartParkSession.SignInRequiredException.class, () -> client.request("permit/list", "POST", "\"\""));
         assertEquals(2, calls[0]);
     }
 
@@ -62,7 +63,7 @@ public final class SmartParkSessionTest {
             calls[0]++;
             return response(503, "{}");
         }, new MemoryStore());
-        assertThrows(IllegalStateException.class, () -> client.request("permit/list", "POST", "\"\""));
+        assertThrows(IOException.class, () -> client.request("permit/list", "POST", "\"\""));
         assertEquals(1, calls[0]);
     }
 }

@@ -6,10 +6,8 @@ import android.content.Intent;
 
 public final class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
-        if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction()) ||
-            !ArrivalGeofences.enabled(context) || !ArrivalGeofences.permissionsGranted(context)) return;
-        PendingResult pending = goAsync();
-        try { ArrivalGeofences.register(context, task -> pending.finish()); }
-        catch (Exception ignored) { pending.finish(); }
+        String action = intent.getAction();
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(action) && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) return;
+        GeofenceRecoveryWorker.schedule(context, Intent.ACTION_BOOT_COMPLETED.equals(action) ? "phone restarted" : "app updated");
     }
 }

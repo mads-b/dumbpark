@@ -12,6 +12,7 @@ import com.google.android.gms.location.Geofence;
 import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import java.util.Arrays;
 
 final class ArrivalGeofences {
@@ -60,6 +61,14 @@ final class ArrivalGeofences {
     }
 
     static void register(Context context, OnCompleteListener<Void> listener) {
+        registrationTask(context).addOnCompleteListener(listener);
+    }
+
+    static boolean needsRecovery(Context context) {
+        return !ArrivalDiagnostics.prefs(context).getBoolean("registration-ok", false);
+    }
+
+    static Task<Void> registrationTask(Context context) {
         if (!permissionsGranted(context) || !playServicesAvailable(context)) {
             throw new IllegalStateException("Precise background location, notifications, and Google Play services are required.");
         }
@@ -70,8 +79,14 @@ final class ArrivalGeofences {
                 fence("office", 63.3984618, 10.3956557)))
             .build();
         try {
-            LocationServices.getGeofencingClient(context).addGeofences(request, pendingIntent(context))
-                .addOnCompleteListener(listener);
+            ArrivalDiagnostics.prefs(context).edit().putBoolean("registration-ok", false).apply();
+            ArrivalDiagnostics.record(context, "registration", "Registering both work geofences…");
+            return LocationServices.getGeofencingClient(context).addGeofences(request, pendingIntent(context))
+                .addOnCompleteListener(task -> {
+                    ArrivalDiagnostics.prefs(context).edit().putBoolean("registration-ok", task.isSuccessful()).apply();
+                    ArrivalDiagnostics.record(context, "registration", task.isSuccessful()
+                        ? "Both work geofences registered." : "Registration failed; check device location and location accuracy.");
+                });
         } catch (SecurityException error) { throw new IllegalStateException("Location permission was revoked.", error); }
     }
 

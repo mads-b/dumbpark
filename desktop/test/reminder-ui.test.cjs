@@ -26,6 +26,10 @@ function mount(saved) {
     getReminderStatus: async () => saved,
     enableReminders: async () => { saved = { enabled: true, setupPending: false, message: 'On' }; return saved; },
     disableReminders: async () => { saved = { enabled: false, setupPending: false, message: 'Off' }; return saved; },
+    repairReminders: async () => {
+      saved = { ...saved, healthy: true, details: 'Both work geofences registered.' }; return saved;
+    },
+    openReminderSettings: async () => {},
     onReminderStateChanged() {}, onBookingRequested() {}, onSessionState() {},
     onVehiclePlateState() {}, onLoginState() {},
     onDashboardFocus(callback) { focusCallbacks.push(callback); }
@@ -53,4 +57,19 @@ test('arrival reminder control reflects saved state after focus and reload', asy
   const reopened = mount(app.savedState());
   await nextTick();
   assert.equal(reopened.element('enable-reminders').textContent, 'Turn off arrival reminders');
+});
+
+test('enabled reminders show a health warning and can re-arm without changing the setting', async () => {
+  const app = mount({ enabled: true, requestedEnabled: true, healthy: false,
+    message: 'Enabled, but registration needs recovery.', details: 'Last arrival: not recorded' });
+  await nextTick();
+  assert.equal(app.element('enable-reminders').textContent, 'Turn off arrival reminders');
+  assert.equal(app.element('android-reminders').dataset.healthy, 'false');
+  assert.equal(app.element('reminder-details').textContent, 'Last arrival: not recorded');
+  assert.equal(app.element('repair-reminders').hidden, false);
+  await app.element('repair-reminders').listeners.click();
+  assert.equal(app.savedState().enabled, true);
+  assert.equal(app.element('android-reminders').dataset.healthy, 'true');
+  assert.equal(app.element('reminder-details').textContent, 'Both work geofences registered.');
+  assert.equal(app.element('repair-reminders').disabled, false);
 });

@@ -16,8 +16,12 @@ a { color: #79dfaa; }
 .badge { border: 1px solid #52685b; color: #b5c8bb; border-radius: 99px; padding: 5px 10px; font-size: 11px; white-space: nowrap; }
 .badge.good { border-color: #3ba678; color: #79dfaa; }
 .card { background: #1b2420; border: 1px solid #32443a; border-radius: 14px; padding: 22px; margin: 14px 0; }
-#android-reminders[data-enabled="true"] { border-color: #3ba678; }
-#android-reminders[data-enabled="true"] #reminder-status { color: #8be6b5; }
+#android-reminders[data-healthy="true"] { border-color: #3ba678; }
+#android-reminders[data-healthy="true"] #reminder-status { color: #8be6b5; }
+#android-reminders[data-enabled="true"][data-healthy="false"] { border-color: #a6894d; }
+.reminder-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.reminder-health { margin-top: 14px; color: #afc0b7; font-size: 12px; }
+#reminder-details { white-space: pre-line; }
 label { display: block; color: #afc0b7; font-size: 12px; margin: 14px 0 5px; }
 input, select { width: 100%; padding: 11px 12px; border: 1px solid #496050; border-radius: 8px; background: #101514; color: #eaf1ec; font: inherit; font-size: 14px; }
 #new-vehicle-plate { text-transform: uppercase; }
