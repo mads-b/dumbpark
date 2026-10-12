@@ -2,7 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { bookTieto, osloDate, assessVehiclePermit, assessMobilePermits } = require('../../shared/booking.cjs');
+const { bookTieto, osloDate, assessVehiclePermit, assessMobilePermits, reconcileBookingAttempt } = require('../../shared/booking.cjs');
+const { SessionExpiredError } = require('../../shared/mobile.cjs');
 
 const now = new Date('2026-09-25T08:30:00Z');
 const variant = { id: 'variant-1', priceCents: 0,
@@ -111,4 +112,86 @@ test('does not create a second order while the first remains pending', async () 
   assert.equal((await bookTieto(client, { plateNumber: 'AB12345', now })).state, 'pending');
   assert.equal((await bookTieto(client, { plateNumber: 'AB12345', now })).state, 'pending');
   assert.equal(acquisitions, 1);
+});
+
+test('a delayed completed permit retires yesterday’s saved order and permits a new day booking', async () => {
+  let acquisitions = 0;
+  let permits = [];
+  const saved = [];
+  const { client } = clientWith({
+    getMyPermits: async () => permits,
+    persistSession: async () => saved.push(JSON.parse(JSON.stringify({
+      pendingOrderId: client.pendingOrderId, bookingAttempt: client.bookingAttempt,
+      uncertainAcquisition: client.uncertainAcquisition
+    }))),
+    acquirePermit: async () => { acquisitions++; return acquisitions === 1 ? { orderId: 'order-1' }
+      : { permit: { name: 'Tieto Booking Sluppen P40', expiresAt: '2026-09-26T20:30:00Z' } }; }
+  });
+  assert.equal((await bookTieto(client, { plateNumber: 'AB12345', now })).state, 'pending');
+  const restored = { ...client, ...saved.at(-1) };
+  restored.persistSession = async () => {};
+  permits = [{ name: 'Tieto Booking Sluppen P40', validFrom: '2026-09-25T08:30:00Z',
+    expiresAt: '2026-09-25T20:30:00Z', formFields: [{ name: 'plate_number_1', value: 'AB12345' }] }];
+  const tomorrow = new Date('2026-09-26T08:30:00Z');
+  assert.equal((await bookTieto(restored, { plateNumber: 'AB12345', now: tomorrow })).state, 'booked');
+  assert.equal(acquisitions, 2);
+  assert.equal(restored.pendingOrderId, undefined);
+  assert.equal(restored.bookingAttempt, undefined);
+});
+
+test('old or unrelated expired permits do not erase an unresolved attempt', async () => {
+  const oldPermit = { name: 'Tieto Booking Sluppen P40', validFrom: '2026-09-25T07:00:00Z',
+    expiresAt: '2026-09-25T08:00:00Z', formFields: [{ name: 'plate_number_1', value: 'AB12345' }] };
+  let permits = [oldPermit];
+  const { client, calls } = clientWith({ getMyPermits: async () => permits,
+    acquirePermit: async () => ({ orderId: 'order-1' }) });
+  assert.equal((await bookTieto(client, { plateNumber: 'AB12345', now })).state, 'pending');
+  const tomorrow = new Date('2026-09-26T08:30:00Z');
+  for (const unmatched of [oldPermit, { ...oldPermit, validFrom: '2026-09-25T08:30:00Z',
+    expiresAt: '2026-09-25T20:30:00Z', formFields: [{ name: 'plate_number_1', value: 'CD67890' }] }]) {
+    permits = [unmatched];
+    assert.equal((await bookTieto(client, { plateNumber: 'AB12345', now: tomorrow })).state, 'pending');
+    assert.equal(client.pendingOrderId, 'order-1');
+  }
+  assert.equal(calls.filter(call => call === 'catalog').length, 1);
+});
+
+test('concurrent taps share the acquisition and a permit check cannot erase its running guard', async () => {
+  let finish;
+  let started;
+  const acquired = new Promise(resolve => { started = resolve; });
+  let acquisitions = 0;
+  const { client } = clientWith({ acquirePermit: async () => {
+    acquisitions++; started(); return new Promise(resolve => { finish = resolve; });
+  } });
+  const first = bookTieto(client, { plateNumber: 'AB12345', now });
+  await acquired;
+  const second = bookTieto(client, { plateNumber: 'AB12345', now });
+  assert.equal(first, second);
+  assert.equal(await reconcileBookingAttempt(client, [{ name: 'Tieto Booking Sluppen P40',
+    validFrom: '2026-09-25T08:30:00Z', expiresAt: '2026-09-25T20:30:00Z',
+    formFields: [{ name: 'plate_number_1', value: 'AB12345' }] }], { plateNumber: 'AB12345', now }), false);
+  assert.equal(client.uncertainAcquisition, true);
+  finish({ permit: { name: 'Tieto Booking Sluppen P40', expiresAt: '2026-09-25T20:30:00Z' } });
+  assert.equal((await first).state, 'booked');
+  assert.equal((await second).state, 'booked');
+  assert.equal(acquisitions, 1);
+});
+
+test('a storage failure before acquisition does not invent an uncertain booking', async () => {
+  const { client, calls } = clientWith({ persistSession: async () => { throw new Error('Storage failed'); } });
+  await assert.rejects(bookTieto(client, { plateNumber: 'AB12345', now }), /Storage failed/);
+  assert.equal(client.uncertainAcquisition, false);
+  assert.equal(client.bookingAttempt, undefined);
+  assert.equal(calls.some(call => Array.isArray(call) && call[0] === 'acquire'), false);
+  client.persistSession = async () => {};
+  assert.equal((await bookTieto(client, { plateNumber: 'AB12345', now })).state, 'booked');
+});
+
+test('an explicit authentication rejection clears the unsent booking guard and requests sign-in', async () => {
+  const { client, calls } = clientWith({ acquirePermit: async () => { throw new SessionExpiredError(); } });
+  await assert.rejects(bookTieto(client, { plateNumber: 'AB12345', now }), SessionExpiredError);
+  assert.equal(client.uncertainAcquisition, false);
+  assert.equal(client.bookingAttempt, undefined);
+  assert.equal(calls.filter(call => call === 'list').length, 1);
 });

@@ -16,6 +16,10 @@ function showResult(result) {
   if (state === 'needs-sign-in') showSignedIn(false);
   $('result').dataset.state = state;
   $('result').textContent = result?.message || 'SmartPark did not return a booking status.';
+  if (window.dumbPark.capabilities?.canSignIn !== false) {
+    $('at-work').textContent = result?.bookingBlocked ? 'Check booking status'
+      : state === 'checking' ? 'Checking…' : "I'm at work now";
+  }
 }
 
 function showSignedIn(signedIn) {
@@ -67,7 +71,7 @@ async function refreshPermit({ keepCallToAction = false } = {}) {
   try {
     const result = await window.dumbPark.checkPermit();
     if (request === statusRequest) {
-      showResult(keepCallToAction && result.state === 'unknown' ? focusCallToAction(true) : result);
+      showResult(keepCallToAction && result.state === 'unknown' && !result.bookingBlocked ? focusCallToAction(true) : result);
     }
   } catch (error) {
     if (request === statusRequest) {

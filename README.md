@@ -65,6 +65,8 @@ When signed in, DumbPark checks for an active Tieto permit at startup and highli
 
 When the window regains focus or the laptop wakes, DumbPark checks the displayed permit's expiry immediately. An expired permit switches to the red booking prompt while the app checks SmartPark for a newer one.
 
+From 0.3.8, normal permit reads also retire a saved unresolved booking once SmartPark confirms the permit. Each new attempt saves its date, car and pre-existing permit identities in encrypted storage, allowing a later read to recognize its completed permit even after expiry. Old cached flags are reconciled when a current matching permit is found. Unresolved requests remain blocked and the button says **Check booking status**, rather than suggesting another order is running. Concurrent taps share one booking operation, and Android honors request deadlines while ignoring late native replies. A lost acquisition response is still never blindly retried.
+
 ## Tests
 
 ```powershell

@@ -64,4 +64,11 @@ test('focus clears an expired permit immediately and checks for a new one', asyn
   await new Promise(setImmediate);
   assert.equal(element('result').dataset.state, 'missing');
   assert.match(element('result').textContent, /could not verify.*green button/i);
+
+  callbacks.focus();
+  resolveSecondRead({ state: 'unknown', bookingBlocked: true, message: 'Previous booking outcome is uncertain. Check SmartPark.' });
+  await new Promise(setImmediate);
+  assert.equal(element('result').dataset.state, 'unknown');
+  assert.match(element('result').textContent, /Previous booking outcome is uncertain/);
+  assert.equal(element('at-work').textContent, 'Check booking status');
 });

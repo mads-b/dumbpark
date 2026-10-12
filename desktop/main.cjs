@@ -54,6 +54,7 @@ async function saveMobileSession() {
     refreshToken: mobileClient.refreshToken,
     productsService: mobileClient.productsService,
     pendingOrderId: mobileClient.pendingOrderId || null,
+    bookingAttempt: mobileClient.bookingAttempt,
     uncertainAcquisition: mobileClient.uncertainAcquisition
   }));
   await fs.writeFile(sessionFile(), encrypted);
@@ -69,6 +70,7 @@ async function restoreMobileSession() {
     mobileClient.refreshToken = saved.refreshToken;
     mobileClient.productsService = saved.productsService;
     mobileClient.pendingOrderId = saved.pendingOrderId || undefined;
+    mobileClient.bookingAttempt = saved.bookingAttempt || undefined;
     mobileClient.uncertainAcquisition = Boolean(saved.uncertainAcquisition);
     await mobileClient.loadAccount();
     await saveMobileSession();
@@ -81,6 +83,7 @@ async function restoreMobileSession() {
     mobileClient.productsService = undefined;
     mobileClient.pendingOrderId = undefined;
     mobileClient.uncertainAcquisition = false;
+    mobileClient.bookingAttempt = undefined;
     await fs.rm(sessionFile(), { force: true });
     return false;
   }

@@ -39,6 +39,38 @@ test('Android reminder tap reaches the shared booking UI only after a native tap
   assert.equal(window.dumbPark.capabilities.arrivalReminders, true);
 });
 
+test('Android honors a request timeout and ignores a late native response', async () => {
+  const bundle = esbuild.buildSync({
+    entryPoints: [path.join(__dirname, '..', '..', 'android', 'adapter-entry.cjs')],
+    bundle: true, write: false, platform: 'browser', format: 'iife', target: 'es2022'
+  }).outputFiles[0].text;
+  let controller = new AbortController();
+  let requestId;
+  let completed = false;
+  const window = { DumbParkNative: {
+    readState: () => JSON.stringify({ session: { token: 'test-token', productsService: { pathToMyPermits: 'permit/list' } },
+      vehicles: { plateNumbers: ['AB12345'], selectedPlate: 'AB12345' } }),
+    writeState: () => 'ok',
+    call: (id, method) => {
+      assert.equal(method, 'request');
+      requestId = id;
+      if (completed) setTimeout(() => window.dumbParkNativeResult(JSON.stringify({ id,
+        value: { status: 200, body: '{"resultCode":"SUCCESS","permits":[]}' } })), 0);
+    }
+  } };
+  vm.runInNewContext(bundle, { window, setTimeout, URL, AbortSignal: { timeout: () => controller.signal } });
+  const hung = window.dumbPark.checkPermit();
+  controller.abort();
+  const result = await hung;
+  assert.equal(result.state, 'unknown');
+  assert.match(result.message, /timed out/);
+  window.dumbParkNativeResult(JSON.stringify({ id: requestId,
+    value: { status: 200, body: '{"resultCode":"SUCCESS","permits":[]}' } }));
+  controller = new AbortController();
+  completed = true;
+  assert.equal((await window.dumbPark.checkPermit()).state, 'missing');
+});
+
 test('Android restores an expired session, persists renewal, and keeps it through an offline restart', async () => {
   const bundle = esbuild.buildSync({
     entryPoints: [path.join(__dirname, '..', '..', 'android', 'adapter-entry.cjs')],

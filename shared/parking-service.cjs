@@ -1,6 +1,7 @@
 'use strict';
 
-const { assessMobilePermits, assessVehiclePermit, plateFromPermits, validPlate, bookTieto } = require('./booking.cjs');
+const { assessMobilePermits, assessVehiclePermit, plateFromPermits, validPlate, bookTieto,
+  reconcileBookingAttempt, unresolvedBookingState } = require('./booking.cjs');
 const { emptyVehicles, addVehicle, selectVehicle } = require('./vehicles.cjs');
 const { SessionExpiredError } = require('./mobile.cjs');
 
@@ -49,8 +50,12 @@ class ParkingService {
       return { state: 'needs-sign-in', message: 'Sign in to SmartPark to check your parking status.' };
     }
     try {
-      const state = assessVehiclePermit(await this.client.getMyPermits(), this.vehicles.selectedPlate);
+      const permits = await this.client.getMyPermits();
+      await reconcileBookingAttempt(this.client, permits, { plateNumber: this.vehicles.selectedPlate });
+      const state = assessVehiclePermit(permits, this.vehicles.selectedPlate);
       if (state.state === 'missing') {
+        const unresolved = unresolvedBookingState(this.client);
+        if (unresolved) return unresolved;
         return { state: 'missing', message: this.vehicles.plateNumbers.length
           ? '⚠ No active Tieto P40 booking! At work? Click the green button below now.'
           : '⚠ No active Tieto P40 booking! Add a car with +, then click the green button below.' };
@@ -69,6 +74,7 @@ class ParkingService {
       assessment = assessMobilePermits(permits);
       const plate = plateFromPermits(permits);
       if (plate && validPlate(plate)) await this.updateVehicles(addVehicle(this.vehicles, plate, false));
+      await reconcileBookingAttempt(this.client, permits, { plateNumber: this.vehicles.selectedPlate });
     } catch { /* Sign-in still succeeds if the initial permit read fails. */ }
     return assessment;
   }
@@ -79,6 +85,7 @@ class ParkingService {
     this.client.productsService = undefined;
     this.client.pendingOrderId = undefined;
     this.client.uncertainAcquisition = false;
+    this.client.bookingAttempt = undefined;
     this.vehicles = emptyVehicles();
   }
 }

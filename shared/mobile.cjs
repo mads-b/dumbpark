@@ -21,6 +21,7 @@ class MobileClient {
     this.productsService = undefined;
     this.pendingOrderId = undefined;
     this.uncertainAcquisition = false;
+    this.bookingAttempt = undefined;
   }
 
   async request(path, { method = 'GET', body, authenticated = false, idempotencyKey, retryAuth = true } = {}) {

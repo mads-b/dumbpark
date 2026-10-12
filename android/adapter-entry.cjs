@@ -11,11 +11,20 @@ let pendingPhone;
 let initializationStarted = false;
 const emit = (kind, value) => { for (const callback of callbacks[kind]) callback(value); };
 
-function nativeCall(method, payload = {}) {
+function nativeCall(method, payload = {}, signal) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new Error('SmartPark request timed out.')); return; }
     const id = String(++nextId);
-    pending.set(id, { resolve, reject });
-    window.DumbParkNative.call(id, method, JSON.stringify(payload));
+    const onAbort = () => {
+      pending.delete(id);
+      cleanup();
+      reject(new Error('SmartPark request timed out.'));
+    };
+    const cleanup = () => signal?.removeEventListener('abort', onAbort);
+    pending.set(id, { resolve, reject, cleanup });
+    signal?.addEventListener('abort', onAbort, { once: true });
+    try { window.DumbParkNative.call(id, method, JSON.stringify(payload)); }
+    catch (error) { pending.delete(id); cleanup(); reject(error); }
   });
 }
 
@@ -24,6 +33,7 @@ window.dumbParkNativeResult = raw => {
   const waiter = pending.get(answer.id);
   if (!waiter) return;
   pending.delete(answer.id);
+  waiter.cleanup();
   if (answer.error) waiter.reject(new Error(answer.error));
   else waiter.resolve(answer.value);
 };
@@ -31,7 +41,7 @@ window.dumbParkNativeResult = raw => {
 async function nativeFetch(url, options) {
   const result = await nativeCall('request', {
     url: String(url), method: options.method, headers: options.headers, body: options.body
-  });
+  }, options.signal);
   return { ok: result.status >= 200 && result.status < 300, status: result.status,
     json: async () => JSON.parse(result.body || '{}') };
 }
@@ -43,6 +53,7 @@ client.token = saved.session?.token || undefined;
 client.refreshToken = saved.session?.refreshToken || undefined;
 client.productsService = saved.session?.productsService || undefined;
 client.pendingOrderId = saved.session?.pendingOrderId || undefined;
+client.bookingAttempt = saved.session?.bookingAttempt || undefined;
 client.uncertainAcquisition = Boolean(saved.session?.uncertainAcquisition);
 let permitListPath = saved.session?.pathToMyPermits || null;
 let vehicles = parseVehicles(saved.vehicles);
@@ -51,6 +62,7 @@ function persist() {
   const result = window.DumbParkNative.writeState(JSON.stringify({
     session: { token: client.token, refreshToken: client.refreshToken,
       productsService: client.productsService, pendingOrderId: client.pendingOrderId,
+      bookingAttempt: client.bookingAttempt,
       uncertainAcquisition: client.uncertainAcquisition,
       pathToMyPermits: client.productsService?.pathToMyPermits || permitListPath }, vehicles
   }));
@@ -132,6 +144,7 @@ async function restoreSession() {
         client.productsService = undefined;
         client.pendingOrderId = undefined;
         client.uncertainAcquisition = false;
+        client.bookingAttempt = undefined;
         permitListPath = null;
         persist();
       }

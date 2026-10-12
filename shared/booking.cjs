@@ -1,6 +1,57 @@
 'use strict';
 
 const TARGET = 'tieto booking sluppen p40';
+const { SessionExpiredError } = require('./mobile.cjs');
+const bookingsInFlight = new WeakMap();
+const comparablePlate = value => String(value || '').replace(/[ -]/g, '').toUpperCase();
+const targetPermit = permit => String(permit.name || '').trim().toLowerCase() === TARGET;
+
+function permitKey(permit) {
+  return JSON.stringify([permit.id || null, comparablePlate(plateFromPermit(permit)),
+    permit.validFrom || null, permit.expiresAt || null]);
+}
+
+async function clearBookingAttempt(client) {
+  client.pendingOrderId = undefined;
+  client.uncertainAcquisition = false;
+  client.bookingAttempt = undefined;
+  await client.persistSession?.();
+}
+
+async function reconcileBookingAttempt(client, permits, { plateNumber, now = new Date(), fromBooking = false } = {}) {
+  if ((!client.pendingOrderId && !client.uncertainAcquisition) ||
+      (!fromBooking && bookingsInFlight.has(client))) return false;
+  const attempt = client.bookingAttempt;
+  let confirmed;
+  if (attempt) {
+    if (!validPlate(attempt.plateNumber) || !Number.isFinite(attempt.startedAt) ||
+        !Array.isArray(attempt.previousPermitKeys)) return false;
+    confirmed = assessVehiclePermit(permits, attempt.plateNumber, now).state === 'active' || permits.some(permit => {
+      if (!targetPermit(permit) || comparablePlate(plateFromPermit(permit)) !== comparablePlate(attempt.plateNumber) ||
+          attempt.previousPermitKeys.includes(permitKey(permit))) return false;
+      const end = Date.parse(permit.expiresAt);
+      const start = Date.parse(permit.validFrom);
+      // A newly observed permit for this attempt resolves its order even after expiry.
+      return Number.isFinite(start) && Number.isFinite(end) && end > start &&
+        end > attempt.startedAt && start <= now.getTime() && osloDate(new Date(start)) === attempt.date;
+    });
+  } else {
+    // Older versions saved no attempt identity. A current matching permit is the
+    // only evidence available to retire that legacy guard automatically.
+    confirmed = validPlate(plateNumber) && assessVehiclePermit(permits, plateNumber, now).state === 'active';
+  }
+  if (!confirmed) return false;
+  await clearBookingAttempt(client);
+  return true;
+}
+
+function unresolvedBookingState(client) {
+  if (client.pendingOrderId) return { state: 'pending', bookingBlocked: true,
+    message: 'A previous Tieto P40 order is unconfirmed. Check it in SmartPark, then check permits again. No new booking was sent.' };
+  if (client.uncertainAcquisition) return { state: 'unknown', bookingBlocked: true,
+    message: 'A previous booking request has an uncertain outcome. Check SmartPark before trying again. No new booking was sent.' };
+  return null;
+}
 
 function osloDate(at = new Date()) {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -61,11 +112,11 @@ function assessVehiclePermit(permits, plateNumber, at = new Date()) {
   return state;
 }
 
-async function confirmPermit(client, attempts = 6, at = new Date()) {
+async function confirmPermit(client, attempts = 6, at = new Date(), plateNumber) {
   for (let i = 0; i < attempts; i++) {
     if (i) await new Promise(resolve => setTimeout(resolve, client.confirmationDelayMs ?? 2000));
     try {
-      const state = assessMobilePermits(await client.getMyPermits(), at);
+      const state = assessVehiclePermit(await client.getMyPermits(), plateNumber, at);
       if (state.state === 'active') return state;
     } catch { /* A later read or the acquisition response may still confirm it. */ }
   }
@@ -108,61 +159,82 @@ async function prepareTieto(client, permits, plateNumber, now) {
     variantId: variant.id, formData };
 }
 
-async function bookTieto(client, { plateNumber, now = new Date() } = {}) {
+function bookTieto(client, options = {}) {
+  const running = bookingsInFlight.get(client);
+  if (running) {
+    if (comparablePlate(running.plateNumber) === comparablePlate(options.plateNumber)) return running.promise;
+    return Promise.resolve({ state: 'pending', message: 'A booking for another car is running. Let it finish before booking this car.' });
+  }
+  const promise = runBooking(client, options).finally(() => {
+    if (bookingsInFlight.get(client)?.promise === promise) bookingsInFlight.delete(client);
+  });
+  bookingsInFlight.set(client, { plateNumber: options.plateNumber, promise });
+  return promise;
+}
+
+async function runBooking(client, { plateNumber, now = new Date() } = {}) {
   const permits = await client.getMyPermits();
+  await reconcileBookingAttempt(client, permits, { plateNumber, now, fromBooking: true });
   const state = assessVehiclePermit(permits, plateNumber, now);
   if (state.state === 'active') {
-    client.pendingOrderId = undefined;
-    client.uncertainAcquisition = false;
-    await client.persistSession?.();
     return state;
   }
   if (state.state !== 'missing') return state;
-  if (client.pendingOrderId) {
-    return { state: 'pending', message: 'A Tieto P40 order is still pending. Check permits again before trying to book.' };
-  }
-  if (client.uncertainAcquisition) {
-    return { state: 'unknown', message: 'A previous booking request has an uncertain outcome. Check SmartPark before trying again.' };
-  }
+  const unresolved = unresolvedBookingState(client);
+  if (unresolved) return unresolved;
   const prepared = await prepareTieto(client, permits, plateNumber, now);
   if (prepared.state !== 'ready') return prepared;
 
   // Acquisition keeps one idempotency key; only an explicit auth rejection permits a retry.
   // If its response is lost, read the permit list before reporting uncertainty.
   let acquired;
+  const idempotencyKey = globalThis.crypto.randomUUID();
+  client.bookingAttempt = { date: osloDate(now), startedAt: now.getTime(),
+    plateNumber: prepared.formData.find(field => field.name === 'plate_number_1').value,
+    idempotencyKey, previousPermitKeys: permits.filter(targetPermit).map(permitKey) };
   client.uncertainAcquisition = true;
-  await client.persistSession?.();
-  try { acquired = await client.acquirePermit(prepared.variantId, prepared.formData, globalThis.crypto.randomUUID()); }
+  try { await client.persistSession?.(); }
   catch (error) {
-    const after = await confirmPermit(client, 6, now);
+    // The request has not been sent, so this is not an uncertain acquisition.
+    client.bookingAttempt = undefined;
+    client.uncertainAcquisition = false;
+    throw error;
+  }
+  try { acquired = await client.acquirePermit(prepared.variantId, prepared.formData, idempotencyKey); }
+  catch (error) {
+    if (error instanceof SessionExpiredError) {
+      await clearBookingAttempt(client);
+      throw error;
+    }
+    const after = await confirmPermit(client, 6, now, plateNumber);
     if (after) {
-      client.uncertainAcquisition = false;
-      await client.persistSession?.();
+      await clearBookingAttempt(client);
       return after;
     }
-    return { state: 'unknown', message: `Booking outcome is uncertain: ${error.message} Check SmartPark before trying again.` };
+    return { state: 'unknown', bookingBlocked: true,
+      message: `Booking outcome is uncertain: ${error.message} Check SmartPark before trying again.` };
   }
   if (acquired.orderId) {
     client.pendingOrderId = acquired.orderId;
     client.uncertainAcquisition = false;
     await client.persistSession?.();
-    const after = await confirmPermit(client, 6, now);
+    const after = await confirmPermit(client, 6, now, plateNumber);
     if (after) {
-      client.pendingOrderId = undefined;
-      await client.persistSession?.();
+      await clearBookingAttempt(client);
       return after;
     }
-    return { state: 'pending', message: 'SmartPark accepted the order but has not yet confirmed the permit. Check permits again shortly; do not book again.' };
+    return { state: 'pending', bookingBlocked: true,
+      message: 'SmartPark accepted the order but has not yet confirmed the permit. Check permits again shortly; do not book again.' };
   }
   if (!acquired.permit || String(acquired.permit.name || '').trim().toLowerCase() !== TARGET) {
-    return { state: 'unknown', message: 'SmartPark did not confirm the Tieto permit. Check SmartPark before trying again.' };
+    return { state: 'unknown', bookingBlocked: true,
+      message: 'SmartPark did not confirm the Tieto permit. Check SmartPark before trying again.' };
   }
-  client.uncertainAcquisition = false;
-  await client.persistSession?.();
+  await clearBookingAttempt(client);
   const end = Date.parse(acquired.permit.expiresAt);
   return { state: 'booked', message: 'SmartPark confirmed the Tieto P40 booking.',
     validToTime: acquired.permit.expiresAt || null, validToEpochMs: Number.isFinite(end) ? end : null };
 }
 
 module.exports = { osloDate, assessMobilePermits, assessVehiclePermit, plateFromPermits, validPlate,
-  bookTieto };
+  bookTieto, reconcileBookingAttempt, unresolvedBookingState };
